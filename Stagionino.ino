@@ -301,6 +301,59 @@ struct SDManager {
     char program_list[20][64];        // Lista nomi programmi (max 20)
 };
 
+// Enumerazione tipi emergenza
+enum EmergencyType {
+    EMERGENCY_NONE,                   // Nessuna emergenza
+    EMERGENCY_SENSOR_INTERNAL,        // Sensore interno offline
+    EMERGENCY_TEMP_CRITICAL,          // Temperatura critica
+    EMERGENCY_TEMP_EXTERNAL_EXTREME,  // Temperatura esterna estrema
+    EMERGENCY_POWER_ISSUES,           // Problemi alimentazione
+    EMERGENCY_SD_FAILURE,             // Fallimento SD critico
+    EMERGENCY_ACTUATOR_FAILURE        // Fallimento attuatori
+};
+
+// Struttura gestione emergenze
+struct EmergencySystem {
+    bool is_active;                   // Emergenza attiva
+    EmergencyType current_type;       // Tipo emergenza corrente
+    unsigned long start_time;         // Inizio emergenza
+    unsigned long last_check_time;    // Ultimo controllo
+    int trigger_count;                // Contatore trigger
+    char description[128];            // Descrizione emergenza
+    
+    // Parametri recovery
+    bool recovery_attempted;          // Recovery tentato
+    int recovery_attempts;            // Tentativi recovery
+    unsigned long last_recovery_time; // Ultimo tentativo recovery
+    
+    // Condizioni specifiche
+    float critical_temp_threshold;    // Soglia temperatura critica
+    float extreme_temp_low;           // Temperatura estrema bassa
+    float extreme_temp_high;          // Temperatura estrema alta
+    int sensor_failure_threshold;     // Soglia fallimenti sensore
+    
+    // Log emergenze
+    unsigned long total_emergency_time; // Tempo totale in emergenza
+    int emergency_episodes;           // Episodi emergenza totali
+};
+
+// Struttura allarmi avanzati
+struct AlarmSystem {
+    bool buzzer_enabled;              // Buzzer abilitato
+    bool mute_active;                 // Mute temporaneo attivo
+    unsigned long mute_start_time;    // Inizio mute
+    unsigned long mute_duration;      // Durata mute
+    
+    // Pattern allarmi
+    int alarm_pattern;                // Pattern corrente (0=off, 1=beep, 2=continuous)
+    unsigned long last_beep_time;     // Ultimo beep
+    int beep_count;                   // Contatore beep
+    
+    // Priorità allarmi
+    bool high_priority_alarm;         // Allarme alta priorità
+    bool critical_alarm;              // Allarme critico
+};
+
 // ===============================================================================
 // DICHIARAZIONE OGGETTI HARDWARE
 // ===============================================================================
@@ -330,6 +383,8 @@ ControlSystem control_system;       // Sistema di controllo
 StagingProgram current_program;     // Programma corrente
 ProgramExecution program_execution; // Esecuzione programma
 SDManager sd_manager;               // Gestione SD card
+EmergencySystem emergency_system;   // Sistema emergenze
+AlarmSystem alarm_system;           // Sistema allarmi
 
 // ===============================================================================
 // FORWARD DECLARATIONS
@@ -365,10 +420,21 @@ void activateActuator(ActuatorState* actuator, int relay_pin, bool activate);
 void updateActuatorStatistics();
 void logActuatorStats(const __FlashStringHelper* name, ActuatorState* actuator);
 
-// Modalità emergenza
+// Sistema emergenze avanzato
+void initializeEmergencySystem();
 void checkEmergencyConditions();
+void triggerEmergency(EmergencyType type, const char* description);
+void checkEmergencyRecovery();
+void attemptEmergencyRecovery();
 void enterEmergencyMode();
 void exitEmergencyMode();
+const char* getEmergencyTypeName(EmergencyType type);
+
+// Sistema allarmi
+void updateAlarmSystem();
+void playAlarmBeep(int beep_count);
+void muteAlarms(unsigned long duration_ms);
+void toggleBuzzer();
 
 // Interfaccia utente
 void updateDisplay();
@@ -508,6 +574,9 @@ void initializeSystemState() {
     // Inizializzazione gestione programmi e SD
     initializeProgramSystem();
     
+    // Inizializzazione sistema emergenze e allarmi
+    initializeEmergencySystem();
+    
     Serial.println(F("Strutture dati sistema inizializzate"));
 }
 
@@ -551,6 +620,55 @@ void initializeProgramSystem() {
     } else {
         Serial.println(F("SD non disponibile - Solo modalità manuale"));
     }
+}
+
+void initializeEmergencySystem() {
+    // Inizializzazione sistema emergenze
+    emergency_system.is_active = false;
+    emergency_system.current_type = EMERGENCY_NONE;
+    emergency_system.start_time = 0;
+    emergency_system.last_check_time = millis();
+    emergency_system.trigger_count = 0;
+    strcpy(emergency_system.description, "Sistema normale");
+    
+    // Parametri recovery
+    emergency_system.recovery_attempted = false;
+    emergency_system.recovery_attempts = 0;
+    emergency_system.last_recovery_time = 0;
+    
+    // Soglie critiche configurabili
+    emergency_system.critical_temp_threshold = 5.0;      // °C sotto target
+    emergency_system.extreme_temp_low = -10.0;           // °C assoluta
+    emergency_system.extreme_temp_high = 40.0;           // °C assoluta
+    emergency_system.sensor_failure_threshold = 10;      // Fallimenti consecutivi
+    
+    // Statistiche
+    emergency_system.total_emergency_time = 0;
+    emergency_system.emergency_episodes = 0;
+    
+    // Inizializzazione sistema allarmi
+    alarm_system.buzzer_enabled = true;                  // Buzzer abilitato di default
+    alarm_system.mute_active = false;
+    alarm_system.mute_start_time = 0;
+    alarm_system.mute_duration = MUTE_ALARM_DURATION;    // 5 minuti default
+    
+    // Pattern allarmi
+    alarm_system.alarm_pattern = 0;                      // Nessun allarme
+    alarm_system.last_beep_time = 0;
+    alarm_system.beep_count = 0;
+    
+    // Priorità
+    alarm_system.high_priority_alarm = false;
+    alarm_system.critical_alarm = false;
+    
+    Serial.println(F("Sistema emergenze inizializzato"));
+    Serial.print(F("Soglie: Temp critica <"));
+    Serial.print(emergency_system.critical_temp_threshold, 1);
+    Serial.print(F("°C, Estrema "));
+    Serial.print(emergency_system.extreme_temp_low, 1);
+    Serial.print(F("-"));
+    Serial.print(emergency_system.extreme_temp_high, 1);
+    Serial.println(F("°C"));
 }
 
 void initializeControlSystem() {
@@ -1303,32 +1421,83 @@ void emergencyTemperatureControl() {
 }
 
 void checkEmergencyConditions() {
-    // Controllo condizioni che richiedono modalità emergenza
+    unsigned long current_time = millis();
+    emergency_system.last_check_time = current_time;
     
-    // Condizione 1: Sensore interno non risponde per 10 cicli consecutivi
-    if (sensors.internal_error_count >= 10 && !system_state.emergency_mode) {
-        Serial.println(F("EMERGENZA: Sensore interno non risponde da 10 cicli"));
-        enterEmergencyMode();
+    // Controllo mute allarmi (gestione overflow millis)
+    if (alarm_system.mute_active) {
+        if (current_time < alarm_system.mute_start_time) {
+            // Overflow millis rilevato
+            alarm_system.mute_start_time = current_time;
+        }
+        
+        if (current_time - alarm_system.mute_start_time >= alarm_system.mute_duration) {
+            alarm_system.mute_active = false;
+            Serial.println(F("Mute allarmi scaduto"));
+        }
+    }
+    
+    // Se già in emergenza, controlla condizioni di recovery
+    if (emergency_system.is_active) {
+        checkEmergencyRecovery();
+        updateAlarmSystem();
         return;
     }
     
-    // Condizione 2: Temperatura critica (implementazione base)
-    if (sensors.internal_valid && !system_state.emergency_mode) {
-        if (sensors.temp_internal < (0.0 - EMERGENCY_TEMP_OFFSET)) {
-            Serial.print(F("EMERGENZA: Temperatura critica rilevata: "));
-            Serial.print(sensors.temp_internal);
-            Serial.println(F("°C"));
-            enterEmergencyMode();
+    // === CONTROLLI EMERGENZE MULTIPLE ===
+    
+    // 1. Sensore interno critico
+    if (sensors.internal_error_count >= emergency_system.sensor_failure_threshold) {
+        triggerEmergency(EMERGENCY_SENSOR_INTERNAL, 
+                        "Sensore interno offline da troppo tempo");
+        return;
+    }
+    
+    // 2. Temperatura critica relativa al target
+    if (sensors.internal_valid) {
+        float target_avg = (control_system.target_temp_min + control_system.target_temp_max) / 2.0;
+        if (sensors.temp_internal < target_avg - emergency_system.critical_temp_threshold) {
+            snprintf(emergency_system.description, sizeof(emergency_system.description),
+                    "Temperatura critica: %.1f°C (%.1f°C sotto target)", 
+                    sensors.temp_internal, target_avg - sensors.temp_internal);
+            triggerEmergency(EMERGENCY_TEMP_CRITICAL, emergency_system.description);
             return;
         }
     }
     
-    // Condizione di uscita: sensore interno torna funzionante
-    if (system_state.emergency_mode && sensors.internal_valid && 
-        sensors.internal_error_count == 0) {
-        Serial.println(F("Condizioni normalizzate, uscita da modalità emergenza"));
-        exitEmergencyMode();
+    // 3. Temperature estreme assolute (interno o esterno)
+    if (sensors.internal_valid) {
+        if (sensors.temp_internal < emergency_system.extreme_temp_low || 
+            sensors.temp_internal > emergency_system.extreme_temp_high) {
+            snprintf(emergency_system.description, sizeof(emergency_system.description),
+                    "Temperatura interna estrema: %.1f°C", sensors.temp_internal);
+            triggerEmergency(EMERGENCY_TEMP_EXTERNAL_EXTREME, emergency_system.description);
+            return;
+        }
     }
+    
+    if (sensors.external_valid) {
+        if (sensors.temp_external < -20.0 || sensors.temp_external > 50.0) {
+            snprintf(emergency_system.description, sizeof(emergency_system.description),
+                    "Temperatura esterna estrema: %.1f°C", sensors.temp_external);
+            triggerEmergency(EMERGENCY_TEMP_EXTERNAL_EXTREME, emergency_system.description);
+            return;
+        }
+    }
+    
+    // 4. Fallimento SD critico durante programma automatico
+    if (program_execution.is_running && !sd_manager.is_available && 
+        sd_manager.retry_count >= SD_RETRY_COUNT) {
+        triggerEmergency(EMERGENCY_SD_FAILURE, 
+                        "SD card fallita durante esecuzione programma");
+        return;
+    }
+    
+    // 5. Problemi attuatori (esempio: tutti i relè non rispondono)
+    // TODO: Implementare monitoraggio feedback attuatori se disponibile
+    
+    // Aggiorna pattern allarmi per condizioni borderline
+    updateAlarmSystem();
 }
 
 void enterEmergencyMode() {
@@ -1355,15 +1524,219 @@ void enterEmergencyMode() {
     switchToScreen(SCREEN_EMERGENCY);
 }
 
-void exitEmergencyMode() {
-    system_state.emergency_mode = false;
+void triggerEmergency(EmergencyType type, const char* description) {
+    // Se già in emergenza dello stesso tipo, ignora
+    if (emergency_system.is_active && emergency_system.current_type == type) {
+        emergency_system.trigger_count++;
+        return;
+    }
+    
+    // Nuova emergenza
+    emergency_system.is_active = true;
+    emergency_system.current_type = type;
+    emergency_system.start_time = millis();
+    emergency_system.trigger_count = 1;
+    emergency_system.recovery_attempted = false;
+    emergency_system.recovery_attempts = 0;
+    emergency_system.emergency_episodes++;
+    strncpy(emergency_system.description, description, sizeof(emergency_system.description) - 1);
+    
+    // Attiva modalità emergenza sistema
+    system_state.emergency_mode = true;
+    
+    // Configura allarmi basati su priorità
+    switch (type) {
+        case EMERGENCY_SENSOR_INTERNAL:
+        case EMERGENCY_TEMP_CRITICAL:
+            alarm_system.critical_alarm = true;
+            alarm_system.alarm_pattern = 2; // Continuo
+            break;
+            
+        case EMERGENCY_TEMP_EXTERNAL_EXTREME:
+        case EMERGENCY_SD_FAILURE:
+            alarm_system.high_priority_alarm = true;
+            alarm_system.alarm_pattern = 1; // Beep intermittente
+            break;
+            
+        default:
+            alarm_system.alarm_pattern = 1;
+            break;
+    }
+    
+    // Log emergenza
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║      🚨 EMERGENZA ATTIVATA 🚨       ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    Serial.print(F("Tipo: "));
+    Serial.println(getEmergencyTypeName(type));
+    Serial.print(F("Descrizione: "));
+    Serial.println(description);
+    Serial.println(F(""));
+    
+    // Entra in modalità emergenza sistema
+    enterEmergencyMode();
+}
+
+void checkEmergencyRecovery() {
+    if (!emergency_system.is_active) {
+        return;
+    }
+    
+    unsigned long current_time = millis();
+    bool can_recover = false;
+    
+    // Controlli recovery specifici per tipo emergenza
+    switch (emergency_system.current_type) {
+        case EMERGENCY_SENSOR_INTERNAL:
+            // Recovery se sensore torna funzionante
+            can_recover = sensors.internal_valid && sensors.internal_error_count < 3;
+            break;
+            
+        case EMERGENCY_TEMP_CRITICAL:
+            // Recovery se temperatura torna in range accettabile
+            if (sensors.internal_valid) {
+                float target_avg = (control_system.target_temp_min + control_system.target_temp_max) / 2.0;
+                can_recover = sensors.temp_internal > target_avg - (emergency_system.critical_temp_threshold / 2.0);
+            }
+            break;
+            
+        case EMERGENCY_TEMP_EXTERNAL_EXTREME:
+            // Recovery se temperature tornano in range
+            can_recover = true;
+            if (sensors.internal_valid) {
+                if (sensors.temp_internal < emergency_system.extreme_temp_low + 2.0 || 
+                    sensors.temp_internal > emergency_system.extreme_temp_high - 2.0) {
+                    can_recover = false;
+                }
+            }
+            break;
+            
+        case EMERGENCY_SD_FAILURE:
+            // Recovery se SD torna disponibile
+            can_recover = sd_manager.is_available;
+            break;
+            
+        default:
+            can_recover = false;
+            break;
+    }
+    
+    // Tentativo recovery se condizioni soddisfatte
+    if (can_recover) {
+        // Attendi almeno 2 minuti prima del primo tentativo
+        if (current_time - emergency_system.start_time >= 120000 && 
+            current_time - emergency_system.last_recovery_time >= 60000) {
+            
+            attemptEmergencyRecovery();
+        }
+    }
+    
+    // Aggiorna statistiche tempo emergenza
+    emergency_system.total_emergency_time = current_time - emergency_system.start_time;
+}
+
+void attemptEmergencyRecovery() {
+    emergency_system.recovery_attempted = true;
+    emergency_system.recovery_attempts++;
+    emergency_system.last_recovery_time = millis();
     
     Serial.println(F(""));
     Serial.println(F("╔══════════════════════════════════════╗"));
-    Serial.println(F("║     USCITA MODALITÀ EMERGENZA       ║"));
+    Serial.println(F("║      🔄 TENTATIVO RECOVERY 🔄       ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    Serial.print(F("Tentativo: "));
+    Serial.print(emergency_system.recovery_attempts);
+    Serial.print(F(" per "));
+    Serial.println(getEmergencyTypeName(emergency_system.current_type));
+    
+    // Recovery specifico per tipo
+    bool recovery_success = false;
+    
+    switch (emergency_system.current_type) {
+        case EMERGENCY_SENSOR_INTERNAL:
+            // Verifica sensore per 3 letture consecutive
+            recovery_success = sensors.internal_valid && sensors.internal_error_count == 0;
+            break;
+            
+        case EMERGENCY_TEMP_CRITICAL:
+            // Verifica temperatura stabile per almeno 5 minuti
+            recovery_success = sensors.internal_valid && 
+                              (millis() - emergency_system.start_time >= 300000);
+            break;
+            
+        case EMERGENCY_SD_FAILURE:
+            // Test operazioni SD
+            recovery_success = checkSDAvailability();
+            if (recovery_success) {
+                loadProgramList(); // Ricarica lista programmi
+            }
+            break;
+            
+        default:
+            recovery_success = true; // Recovery generico
+            break;
+    }
+    
+    if (recovery_success) {
+        exitEmergencyMode();
+        Serial.println(F("✅ RECOVERY RIUSCITO"));
+    } else {
+        Serial.println(F("❌ Recovery fallito, continua emergenza"));
+        
+        // Dopo 3 tentativi falliti, accetta la situazione
+        if (emergency_system.recovery_attempts >= 3) {
+            Serial.println(F("⚠️  Recovery abbandonato dopo 3 tentativi"));
+            // Rimane in emergenza ma smette di tentare recovery automatico
+        }
+    }
+    Serial.println(F(""));
+}
+
+void exitEmergencyMode() {
+    // Salva statistiche
+    emergency_system.total_emergency_time = millis() - emergency_system.start_time;
+    
+    // Reset stato emergenza
+    emergency_system.is_active = false;
+    emergency_system.current_type = EMERGENCY_NONE;
+    strcpy(emergency_system.description, "Sistema ripristinato");
+    
+    // Reset modalità sistema
+    system_state.emergency_mode = false;
+    
+    // Reset allarmi
+    alarm_system.critical_alarm = false;
+    alarm_system.high_priority_alarm = false;
+    alarm_system.alarm_pattern = 0;
+    
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║     ✅ USCITA MODALITÀ EMERGENZA    ║"));
     Serial.println(F("║    RIPRISTINO OPERAZIONI NORMALI    ║"));
     Serial.println(F("╚══════════════════════════════════════╝"));
+    Serial.print(F("Tempo totale emergenza: "));
+    Serial.print(emergency_system.total_emergency_time / 60000);
+    Serial.println(F(" minuti"));
     Serial.println(F(""));
+    
+    // Torna alla schermata precedente se era emergenza
+    if (ui_state.current_screen == SCREEN_EMERGENCY) {
+        switchToScreen(SCREEN_MAIN_DASHBOARD);
+    }
+}
+
+const char* getEmergencyTypeName(EmergencyType type) {
+    switch (type) {
+        case EMERGENCY_NONE: return "Nessuna";
+        case EMERGENCY_SENSOR_INTERNAL: return "Sensore Interno";
+        case EMERGENCY_TEMP_CRITICAL: return "Temperatura Critica";
+        case EMERGENCY_TEMP_EXTERNAL_EXTREME: return "Temperatura Estrema";
+        case EMERGENCY_POWER_ISSUES: return "Problemi Alimentazione";
+        case EMERGENCY_SD_FAILURE: return "Fallimento SD";
+        case EMERGENCY_ACTUATOR_FAILURE: return "Fallimento Attuatori";
+        default: return "Sconosciuta";
+    }
 }
 
 void updateDisplay() {
@@ -1697,29 +2070,83 @@ void drawEmergencyScreen() {
     
     tft.setTextColor(COLOR_WHITE);
     tft.setTextSize(TEXT_SIZE_LARGE);
-    tft.setCursor(50, 50);
-    tft.println(F("EMERGENZA"));
+    tft.setCursor(30, 20);
+    tft.println(F("🚨 EMERGENZA"));
     
+    // Tipo emergenza
     tft.setTextSize(TEXT_SIZE_MEDIUM);
-    tft.setCursor(20, 100);
-    tft.println(F("MODALITA SICURA"));
+    tft.setCursor(10, 60);
+    tft.print(F("Tipo: "));
+    if (emergency_system.is_active) {
+        tft.println(getEmergencyTypeName(emergency_system.current_type));
+    } else {
+        tft.println(F("Nessuna"));
+    }
     
+    // Descrizione emergenza
     tft.setTextSize(TEXT_SIZE_SMALL);
-    tft.setCursor(20, 140);
-    tft.println(F("- Sensore interno offline"));
-    tft.setCursor(20, 160);
-    tft.println(F("- Solo controllo frigorifero"));
-    tft.setCursor(20, 180);
-    tft.println(F("- Temperatura sicurezza: 4C"));
+    tft.setCursor(10, 90);
+    tft.println(F("Descrizione:"));
+    tft.setCursor(10, 110);
+    if (emergency_system.is_active) {
+        // Spezza descrizione lunga su più righe
+        char desc_copy[128];
+        strncpy(desc_copy, emergency_system.description, 127);
+        desc_copy[127] = '\0';
+        
+        char* line = strtok(desc_copy, " ");
+        int line_length = 0;
+        int y_pos = 110;
+        
+        while (line != NULL && y_pos < 180) {
+            int word_length = strlen(line);
+            if (line_length + word_length > 35) { // Max ~35 caratteri per riga
+                y_pos += 15;
+                line_length = 0;
+                tft.setCursor(10, y_pos);
+            }
+            tft.print(line);
+            tft.print(F(" "));
+            line_length += word_length + 1;
+            line = strtok(NULL, " ");
+        }
+    } else {
+        tft.print(F("Sistema normale"));
+    }
     
-    // Tempo in emergenza
-    tft.setCursor(20, 220);
-    tft.print(F("Tempo emergenza: "));
-    tft.print(millis() / 60000);
-    tft.println(F(" min"));
+    // Informazioni recovery e timing
+    if (emergency_system.is_active) {
+        tft.setCursor(10, 200);
+        tft.print(F("Tentativi recovery: "));
+        tft.println(emergency_system.recovery_attempts);
+        
+        tft.setCursor(10, 220);
+        tft.print(F("Tempo: "));
+        unsigned long elapsed = millis() - emergency_system.start_time;
+        tft.print(elapsed / 60000);
+        tft.print(F("m "));
+        tft.print((elapsed % 60000) / 1000);
+        tft.println(F("s"));
+    }
     
-    drawButton(SCREEN_WIDTH/2 - 60, SCREEN_HEIGHT - 50, 120, 40, 
-               F("DASHBOARD"), COLOR_WHITE);
+    // Status allarmi
+    tft.setCursor(10, 240);
+    tft.print(F("Allarmi: "));
+    if (alarm_system.mute_active) {
+        tft.print(F("MUTE ("));
+        unsigned long remaining = alarm_system.mute_duration - (millis() - alarm_system.mute_start_time);
+        tft.print(remaining / 60000);
+        tft.print(F("m)"));
+    } else if (alarm_system.buzzer_enabled) {
+        tft.print(F("ATTIVI"));
+    } else {
+        tft.print(F("DISABILITATI"));
+    }
+    
+    // Pulsanti azione
+    drawButton(10, SCREEN_HEIGHT - 50, 100, 40, F("DASHBOARD"), COLOR_WHITE);
+    drawButton(120, SCREEN_HEIGHT - 50, 80, 40, F("MUTE"), COLOR_YELLOW);
+    drawButton(210, SCREEN_HEIGHT - 50, 100, 40, F("RECOVERY"), COLOR_GREEN);
 }
 
 void drawCalibrationScreen() {
@@ -1971,9 +2398,30 @@ void handleProgramsTouch() {
 }
 
 void handleEmergencyTouch() {
-    // In modalità emergenza, permettere solo di tornare al dashboard
-    if (touch_data.y > SCREEN_HEIGHT - 60) {
+    // Pulsante Dashboard
+    if (touch_data.x >= 10 && touch_data.x <= 110 && 
+        touch_data.y > SCREEN_HEIGHT - 60) {
         switchToScreen(SCREEN_MAIN_DASHBOARD);
+        return;
+    }
+    
+    // Pulsante Mute
+    if (touch_data.x >= 120 && touch_data.x <= 200 && 
+        touch_data.y > SCREEN_HEIGHT - 60) {
+        muteAlarms(300000); // Mute 5 minuti
+        ui_state.screen_needs_redraw = true;
+        Serial.println(F("Touch: Allarmi silenziati da interfaccia"));
+        return;
+    }
+    
+    // Pulsante Recovery manuale
+    if (touch_data.x >= 210 && touch_data.x <= 310 && 
+        touch_data.y > SCREEN_HEIGHT - 60) {
+        if (emergency_system.is_active) {
+            Serial.println(F("Touch: Recovery manuale richiesto"));
+            attemptEmergencyRecovery();
+            ui_state.screen_needs_redraw = true;
+        }
         return;
     }
 }
@@ -2023,8 +2471,127 @@ void updateLEDs() {
     // TODO: Implementazione completa nel prossimo step
 }
 
+void updateAlarmSystem() {
+    unsigned long current_time = millis();
+    
+    // Se mute attivo, non suonare
+    if (alarm_system.mute_active) {
+        return;
+    }
+    
+    // Se buzzer disabilitato, solo LED
+    if (!alarm_system.buzzer_enabled) {
+        return;
+    }
+    
+    // Pattern allarmi basati su priorità
+    switch (alarm_system.alarm_pattern) {
+        case 0: // Nessun allarme
+            // Silenzio
+            break;
+            
+        case 1: // Beep intermittente (high priority)
+            if (current_time - alarm_system.last_beep_time >= 2000) {
+                playAlarmBeep(1); // 1 beep
+                alarm_system.last_beep_time = current_time;
+                alarm_system.beep_count++;
+            }
+            break;
+            
+        case 2: // Allarme continuo (critical)
+            if (current_time - alarm_system.last_beep_time >= 500) {
+                playAlarmBeep(3); // 3 beep rapidi
+                alarm_system.last_beep_time = current_time;
+                alarm_system.beep_count++;
+            }
+            break;
+            
+        case 3: // Allarme di emergenza estrema
+            if (current_time - alarm_system.last_beep_time >= 200) {
+                playAlarmBeep(5); // 5 beep molto rapidi
+                alarm_system.last_beep_time = current_time;
+                alarm_system.beep_count++;
+            }
+            break;
+    }
+    
+    // Auto-mute dopo 100 beep per evitare disturbo eccessivo
+    if (alarm_system.beep_count >= 100) {
+        muteAlarms(300000); // Mute 5 minuti
+        Serial.println(F("Auto-mute allarmi dopo 100 beep"));
+    }
+}
+
+void playAlarmBeep(int beep_count) {
+    for (int i = 0; i < beep_count; i++) {
+        // Beep acuto per emergenza
+        tone(BUZZER_PIN, 2000, 100);
+        delay(120);
+        
+        if (i < beep_count - 1) {
+            delay(50); // Pausa tra beep
+        }
+    }
+}
+
+void muteAlarms(unsigned long duration_ms) {
+    alarm_system.mute_active = true;
+    alarm_system.mute_start_time = millis();
+    alarm_system.mute_duration = duration_ms;
+    alarm_system.beep_count = 0; // Reset contatore
+    
+    Serial.print(F("Allarmi silenziati per "));
+    Serial.print(duration_ms / 60000);
+    Serial.println(F(" minuti"));
+}
+
+void toggleBuzzer() {
+    alarm_system.buzzer_enabled = !alarm_system.buzzer_enabled;
+    
+    Serial.print(F("Buzzer "));
+    Serial.println(alarm_system.buzzer_enabled ? F("ABILITATO") : F("DISABILITATO"));
+    
+    if (alarm_system.buzzer_enabled) {
+        // Beep di conferma abilitazione
+        tone(BUZZER_PIN, 1500, 200);
+        delay(250);
+        tone(BUZZER_PIN, 1800, 200);
+    }
+}
+
 void handleBuzzer() {
-    // TODO: Implementazione completa nel prossimo step
+    // Aggiorna sistema allarmi
+    updateAlarmSystem();
+    
+    // Controlli aggiuntivi per condizioni borderline (warning)
+    if (!emergency_system.is_active && alarm_system.alarm_pattern == 0) {
+        // Allarmi preventivi per condizioni al limite
+        bool warning_condition = false;
+        
+        // Temperatura vicina al limite
+        if (sensors.internal_valid) {
+            float target_avg = (control_system.target_temp_min + control_system.target_temp_max) / 2.0;
+            float temp_diff = target_avg - sensors.temp_internal;
+            
+            if (temp_diff > emergency_system.critical_temp_threshold * 0.7) {
+                warning_condition = true;
+            }
+        }
+        
+        // Sensore con errori intermittenti
+        if (sensors.internal_error_count > 5 && sensors.internal_error_count < 10) {
+            warning_condition = true;
+        }
+        
+        // Attiva warning beep se necessario
+        if (warning_condition) {
+            static unsigned long last_warning = 0;
+            if (millis() - last_warning >= 30000) { // Ogni 30 secondi
+                tone(BUZZER_PIN, 1000, 150); // Beep basso warning
+                last_warning = millis();
+            }
+        }
+    }
 }
 
 void resetWatchdog() {
