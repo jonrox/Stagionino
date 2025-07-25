@@ -174,6 +174,7 @@ struct SystemState {
     bool am2315_available;            // AM2315C disponibile
     bool dht11_available;             // DHT11 disponibile
     unsigned long uptime;             // Tempo di funzionamento
+    unsigned long manual_mode_start;  // Tempo avvio modalità manuale (millis)
     unsigned long last_watchdog_reset; // Ultimo reset watchdog
 };
 
@@ -500,6 +501,14 @@ void applyBreathingEffect();
 void toggleLEDs();
 void setBrightness(uint8_t brightness);
 
+// Sistema LED Ring Adattivo
+void updateManualModeLEDs();        // Modalità manuale: Ore funzionamento + Attuatori
+void updateAutomaticModeLEDs();     // Modalità automatica: Ore rimanenti + Fasi
+void updateManualHoursRing24();     // Ring 24: Ore funzionamento (conto in avanti)
+void updateActuatorsRing12();       // Ring 12: Attuatori attivi (legenda colori)
+void updateProgramRing24();         // Ring 24: Ore rimanenti (conto alla rovescia)
+void updatePhaseCountdownRing12();  // Ring 12: Fasi programma
+
 // Sistema touch avanzato
 bool processTouchDebounce();
 void processValidTouch();
@@ -602,6 +611,7 @@ void initializeSystemState() {
     system_state.am2315_available = false;
     system_state.dht11_available = false;
     system_state.uptime = millis();
+    system_state.manual_mode_start = millis();  // Inizializza tempo modalità manuale
     system_state.last_watchdog_reset = millis();
     
     // Inizializzazione touch
@@ -3688,37 +3698,17 @@ void updateEmergencyLEDs() {
 }
 
 void updateProgramLEDs() {
-    // Strip 24: Progress bar programma
-    if (program_execution.current_program && program_execution.current_phase < program_execution.current_program->total_phases) {
-        ProgramPhase* phase = &program_execution.current_program->phases[program_execution.current_phase];
-        
-        // Calcola progresso fase corrente
-        float progress = 0.0;
-        if (phase->duration_hours > 0) {
-            unsigned long elapsed = millis() - program_execution.phase_start_time;
-            unsigned long phase_duration_ms = phase->duration_hours * 3600000UL;
-            progress = (float)elapsed / phase_duration_ms;
-            if (progress > 1.0) progress = 1.0;
-        } else {
-            // Fase infinita - effetto breathing
-            progress = (sin(millis() / 2000.0) + 1.0) / 2.0;
-        }
-        
-        // Visualizza progresso
-        int active_leds = (int)(progress * NUM_LEDS_24);
-        CRGB phase_color = CHSV(program_execution.current_phase * 40, 255, 255);
-        
-        for (int i = 0; i < NUM_LEDS_24; i++) {
-            if (i < active_leds) {
-                leds_24[i] = phase_color;
-            } else {
-                leds_24[i] = CRGB::Black;
-            }
-        }
+    // Comportamento diverso per modalità manuale vs automatica
+    if (control_system.manual_mode) {
+        // MODALITÀ MANUALE: Ore funzionamento + Attuatori attivi
+        updateManualModeLEDs();
+    } else if (program_execution.is_running && program_execution.current_program) {
+        // MODALITÀ AUTOMATICA: Ore rimanenti + Fasi programma
+        updateAutomaticModeLEDs();
+    } else {
+        // MODALITÀ NORMALE: Sistema status
+        updateNormalLEDs();
     }
-    
-    // Strip 12: Status attuatori semplificato  
-    updateSystemStatusLEDs();
 }
 
 void updateErrorLEDs() {
@@ -3866,6 +3856,266 @@ void setBrightness(uint8_t brightness) {
     Serial.print(F("LED luminosità: "));
     Serial.print((brightness * 100) / 255);
     Serial.println(F("%"));
+}
+
+// ===============================================================================
+// SISTEMA LED RING CONCENTRICO PER PROGRAMMI
+// ===============================================================================
+
+void updateProgramRing24() {
+    // Ring 24 (Esterno): ORE RIMANENTI - Ogni LED = 1 ora
+    
+    if (!program_execution.current_program) return;
+    
+    ProgramPhase* phase = &program_execution.current_program->phases[program_execution.current_phase];
+    
+    if (phase->duration_hours > 0) {
+        // Fase a tempo: mostra ore rimanenti
+        unsigned long elapsed_ms = millis() - program_execution.phase_start_time;
+        unsigned long phase_duration_ms = phase->duration_hours * 3600000UL;
+        unsigned long remaining_ms = (elapsed_ms < phase_duration_ms) ? 
+                                   (phase_duration_ms - elapsed_ms) : 0;
+        
+        // Calcola ore rimanenti (arrotonda per eccesso)
+        int hours_remaining = (remaining_ms + 3599999) / 3600000; // +59min59s per arrotondare
+        if (hours_remaining > 24) hours_remaining = 24; // Max 24 LED
+        
+        // Colore basato su ore rimanenti
+        CRGB hour_color;
+        if (hours_remaining > 12) {
+            hour_color = CRGB::Green;       // Molto tempo (>12h)
+        } else if (hours_remaining > 6) {
+            hour_color = CRGB::Yellow;      // Medio tempo (6-12h)
+        } else if (hours_remaining > 2) {
+            hour_color = CRGB::Orange;      // Poco tempo (2-6h)
+        } else {
+            hour_color = CRGB::Red;         // Urgente (<2h)
+        }
+        
+        // Visualizza ore rimanenti (conto alla rovescia)
+        for (int i = 0; i < NUM_LEDS_24; i++) {
+            if (i < hours_remaining) {
+                leds_24[i] = hour_color;
+            } else {
+                leds_24[i] = CRGB(10, 10, 10);  // Grigio molto scuro
+            }
+        }
+        
+        // LED lampeggiante per ora corrente
+        if (hours_remaining > 0 && led_system.blink_state) {
+            leds_24[hours_remaining - 1] = CRGB::White;
+        }
+        
+    } else {
+        // Fase infinita: effetto rotante
+        unsigned long elapsed = millis() / 200;
+        for (int i = 0; i < NUM_LEDS_24; i++) {
+            int offset = (i + elapsed) % NUM_LEDS_24;
+            if (offset < 4) {
+                leds_24[i] = CRGB::Purple;
+            } else {
+                leds_24[i] = CRGB(20, 0, 20);  // Viola scuro
+            }
+        }
+    }
+}
+
+void updatePhaseCountdownRing12() {
+    // Ring 12 (Interno): FASI PROGRAMMA - Ogni LED = 1 fase
+    
+    if (!program_execution.current_program) return;
+    
+    int total_phases = program_execution.current_program->total_phases;
+    int current_phase = program_execution.current_phase;
+    
+    // Spegni tutti i LED
+    for (int i = 0; i < NUM_LEDS_12; i++) {
+        leds_12[i] = CRGB::Black;
+    }
+    
+    // Accendi LED per fasi del programma (max 12 fasi visualizzabili)
+    int max_display_phases = min(total_phases, NUM_LEDS_12);
+    
+    for (int phase = 0; phase < max_display_phases; phase++) {
+        CRGB phase_color;
+        
+        if (phase < current_phase) {
+            // Fasi completate: Verde
+            phase_color = CRGB::Green;
+            
+        } else if (phase == current_phase) {
+            // Fase corrente: Lampeggiante o colore distintivo
+            if (led_system.blink_state) {
+                phase_color = CRGB::White;      // Lampeggio bianco
+            } else {
+                phase_color = CRGB::Blue;       // Blu per fase attiva
+            }
+            
+        } else {
+            // Fasi future: Grigio scuro
+            phase_color = CRGB(30, 30, 30);
+        }
+        
+        leds_12[phase] = phase_color;
+    }
+    
+    // Se ci sono più di 12 fasi, indica overflow con ultimo LED rosso
+    if (total_phases > NUM_LEDS_12) {
+        leds_12[NUM_LEDS_12 - 1] = CRGB::Red;  // Indica "più fasi"
+    }
+    
+    // Indica fase infinita con effetto speciale
+    if (current_phase < total_phases) {
+        ProgramPhase* phase = &program_execution.current_program->phases[current_phase];
+        if (phase->is_final_phase) {
+            // Fase infinita: breathing sull'LED della fase corrente
+            uint8_t breathing = (sin(millis() / 1500.0) * 100) + 155;
+            leds_12[current_phase] = CRGB(breathing, 0, breathing); // Viola pulsante
+        }
+    }
+}
+
+void updateManualModeLEDs() {
+    // === MODALITÀ MANUALE ===
+    
+    // Ring 24: ORE DI FUNZIONAMENTO (conto in avanti)
+    updateManualHoursRing24();
+    
+    // Ring 12: ATTUATORI ATTIVI (legenda colori)
+    updateActuatorsRing12();
+}
+
+void updateAutomaticModeLEDs() {
+    // === MODALITÀ AUTOMATICA ===
+    
+    // Ring 24: ORE RIMANENTI (conto alla rovescia)
+    updateProgramRing24();
+    
+    // Ring 12: FASI PROGRAMMA
+    updatePhaseCountdownRing12();
+}
+
+void updateManualHoursRing24() {
+    // Ring 24: ORE DI FUNZIONAMENTO in modalità manuale
+    
+    // Calcola ore di funzionamento dall'avvio modalità manuale
+    unsigned long elapsed_ms = millis() - system_state.manual_mode_start;
+    int hours_running = elapsed_ms / 3600000; // Ore complete
+    
+    // Limita a 24 LED
+    if (hours_running > 24) hours_running = 24;
+    
+    // Colore basato su ore di funzionamento
+    CRGB hour_color;
+    if (hours_running < 6) {
+        hour_color = CRGB::Green;       // Funzionamento recente
+    } else if (hours_running < 12) {
+        hour_color = CRGB::Yellow;      // Funzionamento normale
+    } else if (hours_running < 18) {
+        hour_color = CRGB::Orange;      // Funzionamento prolungato
+    } else {
+        hour_color = CRGB::Red;         // Funzionamento molto lungo
+    }
+    
+    // Visualizza ore di funzionamento (conto in avanti)
+    for (int i = 0; i < NUM_LEDS_24; i++) {
+        if (i < hours_running) {
+            leds_24[i] = hour_color;
+        } else {
+            leds_24[i] = CRGB(5, 5, 5);  // Grigio molto scuro
+        }
+    }
+    
+    // LED lampeggiante per ora corrente
+    if (hours_running < NUM_LEDS_24 && led_system.blink_state) {
+        leds_24[hours_running] = CRGB::White;
+    }
+}
+
+void updateActuatorsRing12() {
+    // Ring 12: ATTUATORI ATTIVI con legenda colori
+    
+    // Spegni tutti i LED
+    for (int i = 0; i < NUM_LEDS_12; i++) {
+        leds_12[i] = CRGB::Black;
+    }
+    
+    // Legenda colori attuatori (posizioni fisse)
+    // LED 0-5: Attuatori principali
+    // LED 6-11: Indicatori sistema/extra
+    
+    int led_pos = 0;
+    
+    // LED 0: Frigorifero
+    if (control_system.frigorifero.is_active) {
+        leds_12[0] = CRGB::Blue;
+        if (control_system.frigorifero.protection_active && led_system.blink_state) {
+            leds_12[0] = CRGB::Black;  // Blink se in protezione
+        }
+    } else {
+        leds_12[0] = CRGB(10, 10, 30);  // Blu molto scuro (spento)
+    }
+    
+    // LED 1: Riscaldatore
+    if (control_system.riscaldatore.is_active) {
+        leds_12[1] = CRGB::Red;
+        if (control_system.riscaldatore.protection_active && led_system.blink_state) {
+            leds_12[1] = CRGB::Black;
+        }
+    } else {
+        leds_12[1] = CRGB(30, 10, 10);  // Rosso molto scuro
+    }
+    
+    // LED 2: Deumidificatore
+    if (control_system.deumidificatore.is_active) {
+        leds_12[2] = CRGB::Orange;
+        if (control_system.deumidificatore.protection_active && led_system.blink_state) {
+            leds_12[2] = CRGB::Black;
+        }
+    } else {
+        leds_12[2] = CRGB(30, 15, 5);   // Arancione molto scuro
+    }
+    
+    // LED 3: Umidificatore
+    if (control_system.umidificatore.is_active) {
+        leds_12[3] = CRGB::Cyan;
+        if (control_system.umidificatore.protection_active && led_system.blink_state) {
+            leds_12[3] = CRGB::Black;
+        }
+    } else {
+        leds_12[3] = CRGB(5, 30, 30);   // Ciano molto scuro
+    }
+    
+    // LED 4: Ventola IN
+    if (control_system.ventola_in.is_active) {
+        leds_12[4] = CRGB::Green;
+        if (control_system.ventola_in.protection_active && led_system.blink_state) {
+            leds_12[4] = CRGB::Black;
+        }
+    } else {
+        leds_12[4] = CRGB(10, 30, 10);  // Verde molto scuro
+    }
+    
+    // LED 5: Ventola OUT
+    if (control_system.ventola_out.is_active) {
+        leds_12[5] = CRGB::Lime;
+        if (control_system.ventola_out.protection_active && led_system.blink_state) {
+            leds_12[5] = CRGB::Black;
+        }
+    } else {
+        leds_12[5] = CRGB(20, 30, 5);   // Lime molto scuro
+    }
+    
+    // LED 6-11: Indicatori sistema
+    leds_12[6] = sensors.internal_valid ? CRGB::Green : CRGB::Red;      // Sensore interno
+    leds_12[7] = sensors.external_valid ? CRGB::Green : CRGB::Yellow;   // Sensore esterno
+    leds_12[8] = system_state.rtc_available ? CRGB::Green : CRGB::Red;  // RTC
+    leds_12[9] = system_state.sd_available ? CRGB::Green : CRGB::Red;   // SD Card
+    
+    // LED 10-11: Heartbeat
+    bool heartbeat = (millis() % 2000) < 100;
+    leds_12[10] = heartbeat ? CRGB::White : CRGB::Black;
+    leds_12[11] = heartbeat ? CRGB::White : CRGB::Black;
 }
 
 void handleMillisOverflow() {
