@@ -1,0 +1,17 @@
+STAGIONINO_PROGRAM
+NAME:Salame Felino
+DESC:Programma classico per salame felino - 3 fasi tradizionali
+
+# Fase 1: Stufatura - Non controllare umidità
+PHASE:Stufatura,18.0,20.0,-1,-1,48,0
+
+# Fase 2: Asciugatura - Controllo umidità attivo
+PHASE:Asciugatura,19.0,20.0,70.0,85.0,168,0
+
+# Fase 3: Invecchiamento - Fase finale infinita
+PHASE:Invecchiamento,10.0,12.0,58.0,62.0,720,1
+
+# Formato PHASE: nome,temp_min,temp_max,hum_min,hum_max,duration_hours,is_final
+# hum_min/max = -1 significa non controllata
+# duration_hours = 0 significa infinita
+# is_final = 1 significa fase di stagionatura finale 

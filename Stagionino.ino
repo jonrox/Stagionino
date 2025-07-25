@@ -256,6 +256,51 @@ struct ControlSystem {
     bool temp_only_mode;              // Solo controllo temperatura
 };
 
+// Struttura fase programma
+struct ProgramPhase {
+    char name[32];                    // Nome fase (es. "Stufatura")
+    float temp_min;                   // Temperatura minima
+    float temp_max;                   // Temperatura massima
+    float hum_min;                    // Umidità minima (-1 = non controllata)
+    float hum_max;                    // Umidità massima (-1 = non controllata)
+    unsigned long duration_hours;     // Durata in ore (0 = infinita)
+    bool is_final_phase;              // True se fase finale/stagionatura
+};
+
+// Struttura programma completo
+struct StagingProgram {
+    char name[64];                    // Nome programma
+    char description[128];            // Descrizione
+    int total_phases;                 // Numero totale fasi
+    ProgramPhase phases[30];          // Fasi (max 30 come da specifiche)
+    bool is_loaded;                   // Programma caricato in memoria
+    bool is_valid;                    // Programma valido
+};
+
+// Struttura esecuzione programma
+struct ProgramExecution {
+    bool is_running;                  // Programma in esecuzione
+    int current_phase;                // Fase corrente (0-based)
+    unsigned long phase_start_time;   // Inizio fase corrente
+    unsigned long program_start_time; // Inizio programma
+    unsigned long total_elapsed_hours; // Ore totali trascorse
+    StagingProgram* current_program;  // Puntatore al programma corrente
+    bool auto_advance;                // Avanzamento automatico fasi
+    bool phase_completed;             // Fase corrente completata
+};
+
+// Struttura gestione SD
+struct SDManager {
+    bool is_available;                // SD disponibile
+    bool retry_needed;                // Necessita retry
+    int retry_count;                  // Contatore tentativi
+    unsigned long last_retry_time;    // Ultimo tentativo
+    char last_error[64];              // Ultimo errore
+    unsigned long last_operation_time; // Ultima operazione
+    int programs_count;               // Numero programmi disponibili
+    char program_list[20][64];        // Lista nomi programmi (max 20)
+};
+
 // ===============================================================================
 // DICHIARAZIONE OGGETTI HARDWARE
 // ===============================================================================
@@ -282,6 +327,9 @@ SystemState system_state;           // Stato sistema globale
 TouchData touch_data;               // Dati gestione touch
 UIState ui_state;                   // Stato interfaccia utente
 ControlSystem control_system;       // Sistema di controllo
+StagingProgram current_program;     // Programma corrente
+ProgramExecution program_execution; // Esecuzione programma
+SDManager sd_manager;               // Gestione SD card
 
 // ===============================================================================
 // FORWARD DECLARATIONS
@@ -357,10 +405,21 @@ void drawErrorScreen();
 void drawStatusBar();
 void updateScreenData();
 
-// Gestione programmi
-void loadPrograms();
-void executeProgram();
-void switchToManualMode();
+// Gestione programmi e SD
+void initializeProgramSystem();
+bool checkSDAvailability();
+bool retrySDOperation();
+void loadProgramList();
+bool loadProgram(const char* program_name);
+bool parsePhase(String& line, ProgramPhase* phase);
+
+// Esecuzione programmi
+bool startProgram(const char* program_name);
+void stopProgram();
+void updateProgramExecution();
+void advanceToNextPhase();
+void applyPhaseParameters(int phase_index);
+void logProgramStatus();
 
 // Utilità
 void resetWatchdog();
@@ -446,7 +505,52 @@ void initializeSystemState() {
     // Inizializzazione sistema di controllo
     initializeControlSystem();
     
+    // Inizializzazione gestione programmi e SD
+    initializeProgramSystem();
+    
     Serial.println(F("Strutture dati sistema inizializzate"));
+}
+
+void initializeProgramSystem() {
+    // Inizializzazione programma corrente
+    current_program.is_loaded = false;
+    current_program.is_valid = false;
+    current_program.total_phases = 0;
+    strcpy(current_program.name, "Nessuno");
+    strcpy(current_program.description, "Nessun programma caricato");
+    
+    // Inizializzazione esecuzione programma
+    program_execution.is_running = false;
+    program_execution.current_phase = 0;
+    program_execution.phase_start_time = 0;
+    program_execution.program_start_time = 0;
+    program_execution.total_elapsed_hours = 0;
+    program_execution.current_program = nullptr;
+    program_execution.auto_advance = true;
+    program_execution.phase_completed = false;
+    
+    // Inizializzazione gestione SD
+    sd_manager.is_available = system_state.sd_available;
+    sd_manager.retry_needed = false;
+    sd_manager.retry_count = 0;
+    sd_manager.last_retry_time = 0;
+    strcpy(sd_manager.last_error, "Nessun errore");
+    sd_manager.last_operation_time = 0;
+    sd_manager.programs_count = 0;
+    
+    Serial.println(F("Sistema programmi inizializzato"));
+    
+    // Carica lista programmi se SD disponibile
+    if (sd_manager.is_available) {
+        loadProgramList();
+        if (sd_manager.programs_count > 0) {
+            Serial.print(F("Trovati "));
+            Serial.print(sd_manager.programs_count);
+            Serial.println(F(" programmi disponibili"));
+        }
+    } else {
+        Serial.println(F("SD non disponibile - Solo modalità manuale"));
+    }
 }
 
 void initializeControlSystem() {
@@ -550,6 +654,9 @@ void loop() {
         handleSensorErrors();
         lastSensorRead = millis();
     }
+    
+    // Aggiornamento esecuzione programmi
+    updateProgramExecution();
     
     // Aggiornamento sistema di controllo
     updateControlSystem();
@@ -2252,6 +2359,511 @@ void logActuatorStats(const __FlashStringHelper* name, ActuatorState* actuator) 
             Serial.print(F(" [PROTECTED]"));
         }
         Serial.println();
+    }
+}
+
+// ===============================================================================
+// GESTIONE SD CARD E PROGRAMMI
+// ===============================================================================
+
+bool checkSDAvailability() {
+    // Verifica se SD è ancora disponibile
+    if (!sd_manager.is_available) {
+        return false;
+    }
+    
+    // Test rapido di lettura
+    File testFile = SD.open("/");
+    if (!testFile) {
+        sd_manager.is_available = false;
+        strcpy(sd_manager.last_error, "SD card disconnessa");
+        Serial.println(F("ERRORE SD: Card disconnessa"));
+        return false;
+    }
+    testFile.close();
+    
+    return true;
+}
+
+bool retrySDOperation() {
+    // Gestione retry automatico per operazioni SD
+    unsigned long current_time = millis();
+    
+    if (!sd_manager.retry_needed) {
+        return true;
+    }
+    
+    // Attendi intervallo retry
+    if (current_time - sd_manager.last_retry_time < 5000) {
+        return false;
+    }
+    
+    sd_manager.retry_count++;
+    sd_manager.last_retry_time = current_time;
+    
+    Serial.print(F("SD Retry "));
+    Serial.print(sd_manager.retry_count);
+    Serial.print(F("/"));
+    Serial.println(SD_RETRY_COUNT);
+    
+    // Reinizializza SD
+    if (SD.begin(SD_CS)) {
+        sd_manager.is_available = true;
+        sd_manager.retry_needed = false;
+        sd_manager.retry_count = 0;
+        strcpy(sd_manager.last_error, "Recupero riuscito");
+        Serial.println(F("SD: Recupero riuscito"));
+        return true;
+    }
+    
+    // Se supera max retry, passa in modalità fallback
+    if (sd_manager.retry_count >= SD_RETRY_COUNT) {
+        sd_manager.retry_needed = false;
+        sd_manager.is_available = false;
+        strcpy(sd_manager.last_error, "Fallimento permanente");
+        Serial.println(F("SD: Fallimento permanente - Modalità fallback"));
+        
+        // Se programma in esecuzione, continua in modalità manuale
+        if (program_execution.is_running) {
+            Serial.println(F("ATTENZIONE: Programma continua in modalità manuale"));
+            // Non interrompe l'esecuzione, ma disabilita salvataggio stato
+        }
+    }
+    
+    return false;
+}
+
+void loadProgramList() {
+    if (!checkSDAvailability()) {
+        return;
+    }
+    
+    sd_manager.programs_count = 0;
+    
+    File root = SD.open("/programs");
+    if (!root) {
+        strcpy(sd_manager.last_error, "Directory /programs non trovata");
+        return;
+    }
+    
+    while (true) {
+        File entry = root.openNextFile();
+        if (!entry) {
+            break; // Fine file
+        }
+        
+        // Solo file .txt
+        String filename = entry.name();
+        if (filename.endsWith(".txt") && sd_manager.programs_count < 20) {
+            // Rimuovi estensione .txt
+            filename.remove(filename.length() - 4);
+            filename.toCharArray(sd_manager.program_list[sd_manager.programs_count], 64);
+            sd_manager.programs_count++;
+            
+            Serial.print(F("Programma trovato: "));
+            Serial.println(filename);
+        }
+        
+        entry.close();
+    }
+    
+    root.close();
+    sd_manager.last_operation_time = millis();
+}
+
+bool loadProgram(const char* program_name) {
+    if (!checkSDAvailability()) {
+        if (retrySDOperation()) {
+            return loadProgram(program_name); // Retry ricorsivo
+        }
+        return false;
+    }
+    
+    // Costruisci path file
+    char file_path[128];
+    snprintf(file_path, sizeof(file_path), "/programs/%s.txt", program_name);
+    
+    File program_file = SD.open(file_path);
+    if (!program_file) {
+        snprintf(sd_manager.last_error, sizeof(sd_manager.last_error), 
+                "File %s non trovato", program_name);
+        Serial.print(F("ERRORE: "));
+        Serial.println(sd_manager.last_error);
+        return false;
+    }
+    
+    // Reset programma corrente
+    current_program.is_loaded = false;
+    current_program.is_valid = false;
+    current_program.total_phases = 0;
+    
+    // Leggi header programma
+    String line = program_file.readStringUntil('\n');
+    line.trim();
+    
+    if (!line.startsWith("STAGIONINO_PROGRAM")) {
+        strcpy(sd_manager.last_error, "Formato file non valido");
+        program_file.close();
+        return false;
+    }
+    
+    // Leggi nome programma
+    line = program_file.readStringUntil('\n');
+    line.trim();
+    if (line.startsWith("NAME:")) {
+        line.remove(0, 5);
+        line.trim();
+        line.toCharArray(current_program.name, sizeof(current_program.name));
+    }
+    
+    // Leggi descrizione
+    line = program_file.readStringUntil('\n');
+    line.trim();
+    if (line.startsWith("DESC:")) {
+        line.remove(0, 5);
+        line.trim();
+        line.toCharArray(current_program.description, sizeof(current_program.description));
+    }
+    
+    // Leggi fasi
+    int phase_count = 0;
+    while (program_file.available() && phase_count < 30) {
+        line = program_file.readStringUntil('\n');
+        line.trim();
+        
+        if (line.length() == 0 || line.startsWith("#")) {
+            continue; // Riga vuota o commento
+        }
+        
+        if (line.startsWith("PHASE:")) {
+            if (parsePhase(line, &current_program.phases[phase_count])) {
+                phase_count++;
+            } else {
+                snprintf(sd_manager.last_error, sizeof(sd_manager.last_error),
+                        "Errore parsing fase %d", phase_count + 1);
+                program_file.close();
+                return false;
+            }
+        }
+    }
+    
+    program_file.close();
+    
+    if (phase_count == 0) {
+        strcpy(sd_manager.last_error, "Nessuna fase valida trovata");
+        return false;
+    }
+    
+    current_program.total_phases = phase_count;
+    current_program.is_loaded = true;
+    current_program.is_valid = true;
+    
+    Serial.print(F("Programma caricato: "));
+    Serial.print(current_program.name);
+    Serial.print(F(" ("));
+    Serial.print(phase_count);
+    Serial.println(F(" fasi)"));
+    
+    return true;
+}
+
+bool parsePhase(String& line, ProgramPhase* phase) {
+    // Formato: PHASE:nome,temp_min,temp_max,hum_min,hum_max,duration_hours,is_final
+    // Esempio: PHASE:Stufatura,16.0,24.0,-1,-1,24,0
+    
+    line.remove(0, 6); // Rimuovi "PHASE:"
+    
+    // Parse parametri separati da virgola
+    int param_count = 0;
+    int last_comma = -1;
+    
+    for (int i = 0; i <= line.length(); i++) {
+        if (i == line.length() || line.charAt(i) == ',') {
+            String param = line.substring(last_comma + 1, i);
+            param.trim();
+            
+            switch (param_count) {
+                case 0: // Nome fase
+                    param.toCharArray(phase->name, sizeof(phase->name));
+                    break;
+                case 1: // Temp min
+                    phase->temp_min = param.toFloat();
+                    break;
+                case 2: // Temp max
+                    phase->temp_max = param.toFloat();
+                    break;
+                case 3: // Hum min (-1 = non controllata)
+                    phase->hum_min = param.toFloat();
+                    break;
+                case 4: // Hum max (-1 = non controllata)
+                    phase->hum_max = param.toFloat();
+                    break;
+                case 5: // Durata ore (0 = infinita)
+                    phase->duration_hours = param.toInt();
+                    break;
+                case 6: // Fase finale
+                    phase->is_final_phase = (param.toInt() == 1);
+                    break;
+            }
+            
+            param_count++;
+            last_comma = i;
+        }
+    }
+    
+    // Validazione parametri
+    if (param_count < 7) {
+        return false;
+    }
+    
+    if (phase->temp_min < -50 || phase->temp_max > 100 || 
+        phase->temp_min >= phase->temp_max) {
+        return false;
+    }
+    
+    Serial.print(F("  Fase: "));
+    Serial.print(phase->name);
+    Serial.print(F(" T:"));
+    Serial.print(phase->temp_min, 1);
+    Serial.print(F("-"));
+    Serial.print(phase->temp_max, 1);
+    Serial.print(F("°C"));
+    
+    if (phase->hum_min >= 0 && phase->hum_max >= 0) {
+        Serial.print(F(" H:"));
+        Serial.print(phase->hum_min, 1);
+        Serial.print(F("-"));
+        Serial.print(phase->hum_max, 1);
+        Serial.print(F("%"));
+    } else {
+        Serial.print(F(" H:NC"));
+    }
+    
+    if (phase->duration_hours > 0) {
+        Serial.print(F(" Durata:"));
+        Serial.print(phase->duration_hours);
+        Serial.print(F("h"));
+    } else {
+        Serial.print(F(" Durata:INF"));
+    }
+    
+    if (phase->is_final_phase) {
+        Serial.print(F(" [FINALE]"));
+    }
+    
+    Serial.println();
+    
+    return true;
+}
+
+// ===============================================================================
+// ESECUZIONE PROGRAMMI AUTOMATICI
+// ===============================================================================
+
+bool startProgram(const char* program_name) {
+    // Carica il programma
+    if (!loadProgram(program_name)) {
+        return false;
+    }
+    
+    // Inizializza esecuzione
+    program_execution.is_running = true;
+    program_execution.current_phase = 0;
+    program_execution.phase_start_time = millis();
+    program_execution.program_start_time = millis();
+    program_execution.total_elapsed_hours = 0;
+    program_execution.current_program = &current_program;
+    program_execution.auto_advance = true;
+    program_execution.phase_completed = false;
+    
+    // Applica parametri prima fase
+    applyPhaseParameters(0);
+    
+    // Passa in modalità automatica
+    control_system.manual_mode = false;
+    control_system.auto_mode = true;
+    control_system.temp_only_mode = false;
+    
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║       PROGRAMMA AVVIATO              ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    Serial.print(F("Programma: "));
+    Serial.println(current_program.name);
+    Serial.print(F("Fase 1: "));
+    Serial.println(current_program.phases[0].name);
+    Serial.println(F(""));
+    
+    return true;
+}
+
+void stopProgram() {
+    if (!program_execution.is_running) {
+        return;
+    }
+    
+    program_execution.is_running = false;
+    program_execution.current_program = nullptr;
+    
+    // Torna in modalità manuale
+    control_system.manual_mode = true;
+    control_system.auto_mode = false;
+    
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║       PROGRAMMA FERMATO              ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    Serial.println(F(""));
+}
+
+void updateProgramExecution() {
+    if (!program_execution.is_running || !program_execution.current_program) {
+        return;
+    }
+    
+    unsigned long current_time = millis();
+    unsigned long phase_elapsed = current_time - program_execution.phase_start_time;
+    unsigned long phase_elapsed_hours = phase_elapsed / 3600000; // Converti in ore
+    
+    ProgramPhase* current_phase = &program_execution.current_program->phases[program_execution.current_phase];
+    
+    // Aggiorna tempo totale trascorso
+    program_execution.total_elapsed_hours = (current_time - program_execution.program_start_time) / 3600000;
+    
+    // Controlla se fase completata (solo se ha durata limitata)
+    if (current_phase->duration_hours > 0 && phase_elapsed_hours >= current_phase->duration_hours) {
+        program_execution.phase_completed = true;
+        
+        if (program_execution.auto_advance) {
+            advanceToNextPhase();
+        } else {
+            // Attendi comando manuale per avanzare
+            Serial.println(F("Fase completata - Attendere avanzamento manuale"));
+        }
+    }
+    
+    // Log periodico stato programma (ogni ora)
+    static unsigned long last_program_log = 0;
+    if (current_time - last_program_log > 3600000) {
+        last_program_log = current_time;
+        logProgramStatus();
+    }
+}
+
+void advanceToNextPhase() {
+    if (!program_execution.is_running) {
+        return;
+    }
+    
+    int next_phase = program_execution.current_phase + 1;
+    
+    // Se ultima fase o fase finale
+    if (next_phase >= program_execution.current_program->total_phases || 
+        program_execution.current_program->phases[program_execution.current_phase].is_final_phase) {
+        
+        Serial.println(F(""));
+        Serial.println(F("╔══════════════════════════════════════╗"));
+        Serial.println(F("║    PROGRAMMA COMPLETATO              ║"));
+        Serial.println(F("║    FASE DI STAGIONATURA              ║"));
+        Serial.println(F("╚══════════════════════════════════════╝"));
+        Serial.println(F("Continuazione fase finale infinita..."));
+        Serial.println(F(""));
+        
+        // Resta in fase finale infinita
+        program_execution.phase_completed = false;
+        return;
+    }
+    
+    // Avanza alla fase successiva
+    program_execution.current_phase = next_phase;
+    program_execution.phase_start_time = millis();
+    program_execution.phase_completed = false;
+    
+    // Applica parametri nuova fase
+    applyPhaseParameters(next_phase);
+    
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║       AVANZAMENTO FASE               ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    Serial.print(F("Nuova fase "));
+    Serial.print(next_phase + 1);
+    Serial.print(F("/"));
+    Serial.print(program_execution.current_program->total_phases);
+    Serial.print(F(": "));
+    Serial.println(program_execution.current_program->phases[next_phase].name);
+    Serial.println(F(""));
+}
+
+void applyPhaseParameters(int phase_index) {
+    if (phase_index >= program_execution.current_program->total_phases) {
+        return;
+    }
+    
+    ProgramPhase* phase = &program_execution.current_program->phases[phase_index];
+    
+    // Applica parametri temperatura
+    control_system.target_temp_min = phase->temp_min;
+    control_system.target_temp_max = phase->temp_max;
+    
+    // Applica parametri umidità (se controllata)
+    if (phase->hum_min >= 0 && phase->hum_max >= 0) {
+        control_system.target_hum_min = phase->hum_min;
+        control_system.target_hum_max = phase->hum_max;
+        control_system.temp_only_mode = false;
+    } else {
+        // Solo controllo temperatura
+        control_system.temp_only_mode = true;
+    }
+    
+    Serial.print(F("Parametri applicati - T: "));
+    Serial.print(phase->temp_min, 1);
+    Serial.print(F("-"));
+    Serial.print(phase->temp_max, 1);
+    Serial.print(F("°C"));
+    
+    if (!control_system.temp_only_mode) {
+        Serial.print(F(", H: "));
+        Serial.print(phase->hum_min, 1);
+        Serial.print(F("-"));
+        Serial.print(phase->hum_max, 1);
+        Serial.print(F("%"));
+    } else {
+        Serial.print(F(", H: Non controllata"));
+    }
+    Serial.println();
+}
+
+void logProgramStatus() {
+    Serial.println(F("=== STATUS PROGRAMMA ==="));
+    Serial.print(F("Programma: "));
+    Serial.println(program_execution.current_program->name);
+    Serial.print(F("Fase: "));
+    Serial.print(program_execution.current_phase + 1);
+    Serial.print(F("/"));
+    Serial.print(program_execution.current_program->total_phases);
+    Serial.print(F(" - "));
+    Serial.println(program_execution.current_program->phases[program_execution.current_phase].name);
+    
+    unsigned long phase_elapsed = millis() - program_execution.phase_start_time;
+    Serial.print(F("Tempo fase: "));
+    Serial.print(phase_elapsed / 3600000);
+    Serial.print(F("h "));
+    Serial.print((phase_elapsed % 3600000) / 60000);
+    Serial.println(F("m"));
+    
+    Serial.print(F("Tempo totale: "));
+    Serial.print(program_execution.total_elapsed_hours);
+    Serial.println(F("h"));
+    
+    ProgramPhase* phase = &program_execution.current_program->phases[program_execution.current_phase];
+    if (phase->duration_hours > 0) {
+        unsigned long remaining = phase->duration_hours - (phase_elapsed / 3600000);
+        Serial.print(F("Tempo rimanente fase: "));
+        Serial.print(remaining);
+        Serial.println(F("h"));
+    } else {
+        Serial.println(F("Fase infinita"));
     }
 }
 

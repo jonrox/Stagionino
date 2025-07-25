@@ -1,0 +1,15 @@
+STAGIONINO_PROGRAM
+NAME:Salame Milanese
+DESC:Programma avanzato per salame milanese - 4 fasi dettagliate
+
+# Fase 1: Stufatura iniziale
+PHASE:Stufatura,16.0,24.0,-1,-1,24,0
+
+# Fase 2: Pre-Asciugatura
+PHASE:Pre-Asciugatura,15.0,18.0,70.0,80.0,48,0
+
+# Fase 3: Asciugatura progressiva
+PHASE:Asciugatura,15.0,18.0,82.0,88.0,72,0
+
+# Fase 4: Invecchiamento finale
+PHASE:Invecchiamento,8.0,14.0,60.0,70.0,600,1 
