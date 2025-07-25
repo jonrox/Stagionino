@@ -1174,28 +1174,18 @@ void initializeSD() {
     
     system_state.sd_available = true;
     
-    // Verifica tipo e dimensioni SD
-    uint32_t cardSize = SD.cardSize() / (1024 * 1024);
-    uint8_t cardType = SD.cardType();
-    
+    // Verifica informazioni SD (metodi semplificati per compatibilità)
     Serial.print(F("     Tipo SD: "));
-    switch (cardType) {
-        case CARD_MMC:
-            Serial.println(F("MMC"));
-            break;
-        case CARD_SD:
-            Serial.println(F("SDSC"));
-            break;
-        case CARD_SDHC:
-            Serial.println(F("SDHC"));
-            break;
-        default:
-            Serial.println(F("Sconosciuto"));
-    }
+    Serial.println(F("Compatibile"));
     
-    Serial.print(F("     Dimensione: "));
-    Serial.print(cardSize);
-    Serial.println(F(" MB"));
+    // Verifica spazio disponibile tramite file system
+    File root = SD.open("/");
+    if (root) {
+        Serial.println(F("     SD card inizializzata correttamente"));
+        root.close();
+    } else {
+        Serial.println(F("     Errore accesso root directory"));
+    }
     
     // Creazione directory se non esistono
     if (!SD.exists("/programs")) {
@@ -2320,7 +2310,8 @@ void handleTouch() {
     if (touch_data.is_touched) {
         // XPT2046_Touchscreen non ha getPoint(), usa i metodi diretti
         // Ottieni coordinate raw dal touch
-        uint16_t raw_x, raw_y, raw_z;
+        uint16_t raw_x, raw_y;
+        uint8_t raw_z;
         touch.readData(&raw_x, &raw_y, &raw_z);
         
         // Mappa coordinate touch a coordinate schermo

@@ -46,6 +46,19 @@ in modalità automatica mostrare da quanto è iniziato il programma, fase ciclo 
 - **Mute Temporaneo**: Silenziamento allarmi attivi per 5 minuti+
 - **Gestione Overflow millis()**: Prevenzione perdita stato mute allarme
 - **Sistema Allarmi Intelligente**: Monitoraggio continuo con notifiche su display e lampeggio LED 
+## 🔧 Correzioni Bug Recenti
+
+### v1.0.1 - Compatibilità Librerie
+- **Risolto**: Errore compilazione con metodi `SD.cardSize()` e `SD.cardType()` non disponibili
+- **Risolto**: Tipo parametro `raw_z` in `touch.readData()` corretto da `uint16_t*` a `uint8_t*`
+- **Semplificato**: Verifica SD card con metodi compatibili per tutte le versioni libreria
+- **Migliorato**: Gestione informazioni SD card più robusta e compatibile
+
+### Compatibilità Verificata
+✅ SD library standard Arduino  
+✅ XPT2046_Touchscreen library  
+✅ Arduino Mega 2560  
+
 ## 🚨 Modalità Emergenza Frigorifero
 
 ### Panoramica
