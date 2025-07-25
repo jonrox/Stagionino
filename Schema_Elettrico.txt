@@ -1,0 +1,386 @@
+===============================================================================
+                    SCHEMA ELETTRICO STAGIONINO STAGIONATURA SALUMI
+                    VERSIONE 4.0 - SISTEMA ADATTIVO CON VENTOLE
+===============================================================================
+
+ALIMENTAZIONE PRINCIPALE
+===============================================================================
+
+12V DC INPUT
+    │
+    ├─── REGOLATORE 5V/3A ──── 5V LOGICA
+    │         │
+    │         ├─── ARDUINO MEGA 2560 VIN
+    │         ├─── ILI9486 DISPLAY VCC
+    │         ├─── AM2315C VCC
+    │         ├─── DHT11 VCC
+    │         ├─── DS1307 VCC
+    │         ├─── XPT2046 TOUCH VCC
+    │         └─── SD CARD VCC
+    │
+    └─── REGOLATORE 5V/3A ──── 5V RELÈ
+              │
+              └─── MODULO RELÈ 6CH VCC
+
+ARDUINO MEGA 2560 PINOUT
+===============================================================================
+
+POWER:
+    VIN ──── 5V (da regolatore)
+    GND ──── GND (comune)
+    5V  ──── 5V (uscita per sensori)
+
+I2C BUS (SDA=20, SCL=21):
+    SDA ──── AM2315C SDA
+    SCL ──── AM2315C SCL
+    SDA ──── DS1307 SDA
+    SCL ──── DS1307 SCL
+    GND ──── AM2315C GND
+    GND ──── DS1307 GND
+
+TFT DISPLAY SHIELD 3.5" (8-BIT PARALLELO):
+    COLLEGAMENTI AUTOMATICI ARDUINO MEGA -> SHIELD
+    Display ILI9486 usa pin automatici 8-bit paralleli:
+    ├─── PIN 1 (LCD_RST) ──── Display Reset (automatico)
+    ├─── PIN 2 (LCD_CS)  ──── Display Chip Select (automatico)
+    ├─── PIN 3 (LCD_RS)  ──── Display Command/Data (automatico)
+    ├─── PIN 4 (LCD_WR)  ──── Display Write (automatico)
+    ├─── PIN 5 (LCD_RD)  ──── Display Read (automatico)
+    ├─── PIN 9-16 (D0-D7) ──── Display Data Bus 8-bit (automatico)
+    ├─── 5V  ──── Display VCC
+    └─── GND ──── Display GND
+
+SD CARD INTEGRATA (SPI):
+    D4  (CS)  ──── SD CARD CS (PIN 17 shield)
+    D11 (MOSI) ──── SD CARD MOSI (PIN 18 shield - SD_DI)
+    D12 (MISO) ──── SD CARD MISO (PIN 19 shield - SD_DO)
+    D13 (SCK) ──── SD CARD SCK (PIN 20 shield)
+    5V  ──── SD CARD VCC
+    GND ──── SD CARD GND
+
+TOUCHSCREEN XPT2046 (SPI):
+    D7  (IRQ) ──── XPT2046 IRQ (pin dedicato shield)
+    D6  (CS)  ──── XPT2046 CS (pin dedicato shield)
+    D11 (MOSI) ──── XPT2046 MOSI (condiviso con SD)
+    D12 (MISO) ──── XPT2046 MISO (condiviso con SD)
+    D13 (SCK) ──── XPT2046 SCK (condiviso con SD)
+    5V  ──── XPT2046 VCC
+    GND ──── XPT2046 GND
+
+SENSORI:
+    D2  ──── DHT11 DATA
+    5V  ──── DHT11 VCC
+    GND ──── DHT11 GND
+
+LED INDICATORI:
+    D6  ──── WS2812B 24bit DATA
+    5V  ──── WS2812B 24bit VCC
+    GND ──── WS2812B 24bit GND
+    
+    D7  ──── WS2812B 12bit DATA
+    5V  ──── WS2812B 12bit VCC
+    GND ──── WS2812B 12bit GND
+
+BUZZER (PASSIVO PIEZO 5V):
+    D12 ──── BUZZER PASSIVO DATA (PWM/tone)
+    5V  ──── BUZZER VCC
+    GND ──── BUZZER GND
+
+RELAYS (LOGICA INVERTITA - ATTIVO BASSO):
+    D22 ──── RELAY 1 (FRIGORIFERO)
+    D23 ──── RELAY 2 (RISCALDATORE)
+    D24 ──── RELAY 3 (DEUMIDIFICATORE)
+    D25 ──── RELAY 4 (UMIDIFICATORE)
+    D26 ──── RELAY 5 (VENTOLA IMMISSIONE)
+    D27 ──── RELAY 6 (VENTOLA ESTRAZIONE)
+    GND ──── RELAY GND
+    5V  ──── RELAY VCC
+
+DETTAGLIO CONNESSIONI SENSORI
+===============================================================================
+
+AM2315C (I2C):
+    VCC ──── 5V
+    GND ──── GND
+    SDA ──── PIN 20 (SDA)
+    SCL ──── PIN 21 (SCL)
+
+DHT11:
+    VCC ──── 5V
+    GND ──── GND
+    DATA ──── PIN 2
+    (Resistenza pull-up 4.7kΩ tra DATA e VCC)
+
+DS1307 (I2C):
+    VCC ──── 5V
+    GND ──── GND
+    SDA ──── PIN 20 (SDA)
+    SCL ──── PIN 21 (SCL)
+    (Batteria backup 3V CR2032)
+
+TFT SHIELD 3.5" (ILI9486 + XPT2046 + SD):
+    VCC ──── 5V
+    GND ──── GND
+    
+    DISPLAY ILI9486 (8-bit parallelo):
+    ├─── Pin automatici gestiti da MCUFRIEND_kbv
+    ├─── Nessuna configurazione manuale necessaria
+    └─── Shield si monta direttamente su Arduino Mega
+
+XPT2046 TOUCHSCREEN:
+    VCC ──── 5V (condiviso con shield)
+    GND ──── GND (condiviso con shield)
+    CS  ──── PIN 6 (pin dedicato shield)
+    IRQ ──── PIN 7 (pin dedicato shield)
+    MOSI ──── PIN 11 (condiviso SPI)
+    MISO ──── PIN 12 (condiviso SPI)
+    SCK ──── PIN 13 (condiviso SPI)
+
+SD CARD INTEGRATA:
+    VCC ──── 5V (condiviso con shield)
+    GND ──── GND (condiviso con shield)
+    CS  ──── PIN 4 (pin dedicato shield)
+    MOSI ──── PIN 11 (condiviso SPI)
+    MISO ──── PIN 12 (condiviso SPI)
+    SCK ──── PIN 13 (condiviso SPI)
+
+DETTAGLIO CONNESSIONI ATTUATORI
+===============================================================================
+
+MODULO RELÈ 6CH:
+    VCC ──── 5V
+    GND ──── GND
+    IN1 ──── PIN 22 (FRIGORIFERO)
+    IN2 ──── PIN 23 (RISCALDATORE)
+    IN3 ──── PIN 24 (DEUMIDIFICATORE)
+    IN4 ──── PIN 25 (UMIDIFICATORE)
+    IN5 ──── PIN 26 (VENTOLA IMMISSIONE)
+    IN6 ──── PIN 27 (VENTOLA ESTRAZIONE)
+
+USCITE RELÈ:
+    COM1 ──── FRIGORIFERO (220V AC)
+    NO1  ──── FRIGORIFERO (220V AC)
+    
+    COM2 ──── RISCALDATORE (220V AC)
+    NO2  ──── RISCALDATORE (220V AC)
+    
+    COM3 ──── DEUMIDIFICATORE (220V AC)
+    NO3  ──── DEUMIDIFICATORE (220V AC)
+    
+    COM4 ──── UMIDIFICATORE (220V AC)
+    NO4  ──── UMIDIFICATORE (220V AC)
+    
+    COM5 ──── VENTOLA IMMISSIONE (220V AC)
+    NO5  ──── VENTOLA IMMISSIONE (220V AC)
+    
+    COM6 ──── VENTOLA ESTRAZIONE (220V AC)
+    NO6  ──── VENTOLA ESTRAZIONE (220V AC)
+
+SISTEMA VENTOLE
+===============================================================================
+
+VENTOLA IMMISSIONE:
+    - Posizione: Parete esterna della cella
+    - Funzione: Introduzione aria esterna
+    - Controllo: Relè 5 (PIN 26)
+    - Sicurezza: Filtro antipolvere consigliato
+
+VENTOLA ESTRAZIONE:
+    - Posizione: Parete opposta alla immissione
+    - Funzione: Estrazione aria interna
+    - Controllo: Relè 6 (PIN 27)
+    - Sicurezza: Griglia di protezione
+
+CONTROLLO ADATTIVO:
+    - Sensori esterni: DHT11 per condizioni esterne
+    - Algoritmo: Considera temperatura e umidità esterne
+    - Configurazione: Range operativo configurabile
+    - Sicurezza: Cicli minimi per protezione meccanica
+
+PROTEZIONE AMBIENTALE
+===============================================================================
+
+SCATOLE STAGNO IP65:
+    ┌─────────────────────────────────────┐
+    │  SCATOLA 1: ARDUINO + MODULI       │
+    │  Dimensioni: 200x150x80mm          │
+    │  Contenuto:                        │
+    │  - Arduino Mega 2560               │
+    │  - Regolatori 5V                   │
+    │  - Modulo relè 6CH                 │
+    │  - SD Card                         │
+    └─────────────────────────────────────┘
+
+    ┌─────────────────────────────────────┐
+    │  SCATOLA 2: SENSORI                │
+    │  Dimensioni: 100x80x60mm           │
+    │  Contenuto:                        │
+    │  - AM2315C (sensore interno)       │
+    │  - DHT11 (sensore esterno)         │
+    │  - DS1307 (RTC)                    │
+    └─────────────────────────────────────┘
+
+    ┌─────────────────────────────────────┐
+    │  SCATOLA 3: DISPLAY                │
+    │  Dimensioni: 150x100x80mm          │
+    │  Contenuto:                        │
+    │  - ILI9486 Display                 │
+    │  - XPT2046 Touch                   │
+    └─────────────────────────────────────┘
+
+ROUTING CAVI:
+    Tubi corrugati Ø20mm per tutti i cavi
+    Connettori impermeabili M12 per sensori
+    Ghiere di tenuta per passaggio cavi
+    Silicone sigillante sui giunti
+
+DIAGRAMMA COMPLETO
+===============================================================================
+
+                    ALIMENTATORE 12V/5A
+                           │
+                    ┌──────┴──────┐
+                    │             │
+              REGOLATORE    REGOLATORE
+              5V/3A         6V/2A
+                    │             │
+                    │             │
+    ┌───────────────┴─────────────┴───────────────┐
+    │                                             │
+    │  ARDUINO MEGA 2560                          │
+    │  ┌─────────────────────────────────────────┐ │
+    │  │ POWER: VIN, GND, 5V                     │ │
+    │  │ I2C: SDA(20), SCL(21)                   │ │
+    │  │ SPI: D10(CS), D9(RST), D8(DC),          │ │
+    │  │      D11(MOSI), D13(SCK)                │ │
+    │  │ SD: D5(CS), D11(MOSI), D12(MISO),       │ │
+    │  │     D13(SCK)                            │ │
+    │  │ TOUCH: D3(IRQ), D4(CS)                  │ │
+    │  │ SENSORI: D2(DHT11)                      │ │
+    │  │ LED: D6(24bit), D7(12bit)               │ │
+    │  │ BUZZER: D12                             │ │
+    │  │ RELAY: D22-D27 (6 relè)                 │ │
+    │  └─────────────────────────────────────────┘ │
+    │                                             │
+    └───────────────┬─────────────┬───────────────┘
+                    │             │
+                    │             │
+    ┌───────────────┴─────────────┴───────────────┐
+    │                                             │
+    │  SENSORI (I2C + DIGITAL)                    │
+    │  ┌─────────┐  ┌─────────┐  ┌─────────┐      │
+    │  │ AM2315C │  │ DS1307  │  │ DHT11   │      │
+    │  │ SDA,SCL │  │ SDA,SCL │  │ D2      │      │
+    │  │(INTERNO)│  │ (RTC)   │  │(ESTERNO)│      │
+    │  └─────────┘  └─────────┘  └─────────┘      │
+    │                                             │
+    └───────────────┬─────────────┬───────────────┘
+                    │             │
+                    │             │
+    ┌───────────────┴─────────────┴───────────────┐
+    │                                             │
+    │  INTERFACCIA + STORAGE                      │
+    │  ┌─────────────────────────────────────────┐ │
+    │  │ ILI9486 DISPLAY (SPI)                   │ │
+    │  │ XPT2046 TOUCH (SPI)                     │ │
+    │  │ SD CARD (SPI)                           │ │
+    │  └─────────────────────────────────────────┘ │
+    │                                             │
+    └───────────────┬─────────────┬───────────────┘
+                    │             │
+                    │             │
+    ┌───────────────┴─────────────┴───────────────┐
+    │                                             │
+    │  ATTUATORI COMPLETI                         │
+    │  ┌─────────────────────────────────────────┐ │
+    │  │ MODULO RELÈ 6CH                         │ │
+    │  │ IN1 ──── FRIGORIFERO                    │ │
+    │  │ IN2 ──── RISCALDATORE                   │ │
+    │  │ IN3 ──── DEUMIDIFICATORE                │ │
+    │  │ IN4 ──── UMIDIFICATORE                  │ │
+    │  │ IN5 ──── VENTOLA IMMISSIONE             │ │
+    │  │ IN6 ──── VENTOLA ESTRAZIONE             │ │
+    │  └─────────────────────────────────────────┘ │
+    │                                             │
+    └───────────────┬─────────────┬───────────────┘
+                    │             │
+                    │             │
+    ┌───────────────┴─────────────┴───────────────┐
+    │                                             │
+    │  INDICATORI LED                             │
+    │  ┌─────────┐  ┌─────────┐                   │
+    │  │WS2812B  │  │WS2812B  │                   │
+    │  │24bit    │  │12bit    │                   │
+    │  │D6       │  │D7       │                   │
+    │  └─────────┘  └─────────┘                   │
+    │                                             │
+    └─────────────────────────────────────────────┘
+
+NUOVE FUNZIONALITÀ V4.0
+===============================================================================
+
+SISTEMA VENTOLE:
+    - Controllo adattivo basato su condizioni esterne
+    - Configurazione durata e cicli giornalieri
+    - Abilitazione/disabilitazione dinamica
+    - Protezione meccanica con cicli minimi
+
+CONTROLLO ADATTIVO:
+    - Considerazione temperatura esterna
+    - Considerazione umidità esterna
+    - Compensazione automatica target
+    - Range operativo configurabile
+
+DISPOSITIVI DINAMICI:
+    - Abilitazione/disabilitazione umidificatore
+    - Abilitazione/disabilitazione deumidificatore
+    - Abilitazione/disabilitazione ventole
+    - Sistema adattivo in base ai dispositivi disponibili
+
+NOTE IMPORTANTI:
+===============================================================================
+
+1. DISPLAY SHIELD 3.5": Usa interfaccia 8-bit PARALLELA, NON SPI
+   - Shield si monta direttamente su Arduino Mega
+   - Pin automatici gestiti da libreria MCUFRIEND_kbv
+   - Solo touchscreen e SD card usano pin SPI dedicati
+
+2. TUTTI i componenti devono essere in scatole stagno IP65
+3. Utilizzare tubi corrugati per tutti i cavi
+4. Connettori impermeabili M12 per sensori
+5. Ghiere di tenuta per passaggio cavi
+6. Silicone sigillante sui giunti
+7. Resistenza pull-up 4.7kΩ per DHT11
+8. Batteria backup 3V per DS1307
+9. Logica relè attivo basso (LOW = ON, HIGH = OFF)
+10. Alimentazione 5V per tutti i componenti
+11. Terra comune per tutti i componenti
+12. Ventole: posizionamento opposto per ricircolo efficace
+13. Filtri antipolvere consigliati per ventola immissione
+14. Griglia di protezione per ventola estrazione
+
+15. SHIELD TFT: Pin SPI (11,12,13) condivisi tra touchscreen e SD card
+16. TOUCHSCREEN: Pin CS=6, IRQ=7 (verificare se non funziona)
+17. SD CARD: Pin CS=4 (come da pinout shield)
+
+VERIFICA PRE-ACCENSIONE:
+===============================================================================
+
+□ Alimentazione 12V verificata
+□ Regolatori 5V e 6V funzionanti
+□ Connessioni I2C (SDA/SCL) corrette
+□ Shield TFT 3.5" montato correttamente su Arduino Mega
+□ Pin touchscreen (CS=6, IRQ=7) verificati 
+□ Pin SD card (CS=4) verificato
+□ Connessioni SPI condivise (11,12,13) funzionanti
+□ Resistenza pull-up DHT11 installata
+□ Batteria backup DS1307 installata
+□ Scatole stagno sigillate
+□ Tubi corrugati installati
+□ Connettori impermeabili installati
+□ Terra comune verificata
+□ Interruttore differenziale installato
+□ Fusibili appropriati installati
+□ Ventole posizionate correttamente
+□ Filtri antipolvere installati (se applicabile)
+□ Griglie di protezione installate 
