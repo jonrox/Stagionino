@@ -211,6 +211,51 @@ struct UIState {
     uint16_t accent_color;            // Colore accento
 };
 
+// Struttura controllo attuatori
+struct ActuatorState {
+    bool is_active;                   // Stato corrente (ON/OFF)
+    unsigned long last_change_time;   // Ultimo cambio stato
+    unsigned long total_on_time;      // Tempo totale acceso
+    unsigned long total_off_time;     // Tempo totale spento
+    bool protection_active;           // Protezione cicli minimi attiva
+    int error_count;                  // Contatore errori
+};
+
+// Struttura controllo sistema completo
+struct ControlSystem {
+    ActuatorState frigorifero;        // Stato frigorifero
+    ActuatorState riscaldatore;       // Stato riscaldatore
+    ActuatorState deumidificatore;    // Stato deumidificatore
+    ActuatorState umidificatore;      // Stato umidificatore
+    ActuatorState ventola_in;         // Stato ventola immissione
+    ActuatorState ventola_out;        // Stato ventola estrazione
+    
+    // Parametri di controllo
+    float target_temp_min;            // Temperatura minima target
+    float target_temp_max;            // Temperatura massima target
+    float target_hum_min;             // Umidità minima target
+    float target_hum_max;             // Umidità massima target
+    
+    // Isteresi per evitare oscillazioni
+    float temp_hysteresis;            // Isteresi temperatura
+    float hum_hysteresis;             // Isteresi umidità
+    
+    // Timing controlli
+    unsigned long last_temp_control;  // Ultimo controllo temperatura
+    unsigned long last_hum_control;   // Ultimo controllo umidità
+    unsigned long last_vent_control;  // Ultimo controllo ventilazione
+    
+    // Flag abilitazione dispositivi
+    bool dehumidifier_available;      // Deumidificatore disponibile
+    bool humidifier_available;        // Umidificatore disponibile
+    bool ventilation_available;       // Ventilazione disponibile
+    
+    // Modalità operative
+    bool manual_mode;                 // Modalità manuale
+    bool auto_mode;                   // Modalità automatica
+    bool temp_only_mode;              // Solo controllo temperatura
+};
+
 // ===============================================================================
 // DICHIARAZIONE OGGETTI HARDWARE
 // ===============================================================================
@@ -236,6 +281,7 @@ SensorData sensors;                 // Dati sensori globali
 SystemState system_state;           // Stato sistema globale
 TouchData touch_data;               // Dati gestione touch
 UIState ui_state;                   // Stato interfaccia utente
+ControlSystem control_system;       // Sistema di controllo
 
 // ===============================================================================
 // FORWARD DECLARATIONS
@@ -260,6 +306,16 @@ void updateControlSystem();
 void controlTemperature();
 void controlHumidity();
 void controlVentilation();
+void emergencyTemperatureControl();
+
+// Gestione attuatori
+void initializeControlSystem();
+void initActuatorState(ActuatorState* actuator);
+bool canActivateActuator(ActuatorState* actuator, int relay_pin, unsigned long min_on_time, unsigned long min_off_time);
+bool canDeactivateActuator(ActuatorState* actuator, unsigned long min_on_time);
+void activateActuator(ActuatorState* actuator, int relay_pin, bool activate);
+void updateActuatorStatistics();
+void logActuatorStats(const __FlashStringHelper* name, ActuatorState* actuator);
 
 // Modalità emergenza
 void checkEmergencyConditions();
@@ -387,7 +443,66 @@ void initializeSystemState() {
     ui_state.text_color = COLOR_WHITE;
     ui_state.accent_color = COLOR_GREEN;
     
+    // Inizializzazione sistema di controllo
+    initializeControlSystem();
+    
     Serial.println(F("Strutture dati sistema inizializzate"));
+}
+
+void initializeControlSystem() {
+    // Inizializzazione stati attuatori
+    initActuatorState(&control_system.frigorifero);
+    initActuatorState(&control_system.riscaldatore);
+    initActuatorState(&control_system.deumidificatore);
+    initActuatorState(&control_system.umidificatore);
+    initActuatorState(&control_system.ventola_in);
+    initActuatorState(&control_system.ventola_out);
+    
+    // Parametri di controllo default (esempio per salame)
+    control_system.target_temp_min = 10.0;      // °C
+    control_system.target_temp_max = 12.0;      // °C
+    control_system.target_hum_min = 58.0;       // %
+    control_system.target_hum_max = 62.0;       // %
+    
+    // Isteresi per stabilità
+    control_system.temp_hysteresis = 1.0;       // ±1°C
+    control_system.hum_hysteresis = 3.0;        // ±3%
+    
+    // Inizializzazione timing
+    unsigned long current_time = millis();
+    control_system.last_temp_control = current_time;
+    control_system.last_hum_control = current_time;
+    control_system.last_vent_control = current_time;
+    
+    // Dispositivi disponibili (configurabili)
+    control_system.dehumidifier_available = true;
+    control_system.humidifier_available = true;
+    control_system.ventilation_available = true;
+    
+    // Modalità operative
+    control_system.manual_mode = true;          // Inizia in manuale
+    control_system.auto_mode = false;
+    control_system.temp_only_mode = false;
+    
+    Serial.println(F("Sistema di controllo inizializzato"));
+    Serial.print(F("Target: T="));
+    Serial.print(control_system.target_temp_min, 1);
+    Serial.print(F("-"));
+    Serial.print(control_system.target_temp_max, 1);
+    Serial.print(F("°C, H="));
+    Serial.print(control_system.target_hum_min, 1);
+    Serial.print(F("-"));
+    Serial.print(control_system.target_hum_max, 1);
+    Serial.println(F("%"));
+}
+
+void initActuatorState(ActuatorState* actuator) {
+    actuator->is_active = false;
+    actuator->last_change_time = millis();
+    actuator->total_on_time = 0;
+    actuator->total_off_time = 0;
+    actuator->protection_active = false;
+    actuator->error_count = 0;
 }
 
 void printSystemStatus() {
@@ -403,8 +518,15 @@ void printSystemStatus() {
     Serial.print(F("Modalità Emergenza: "));
     Serial.println(system_state.emergency_mode ? F("ATTIVA") : F("NORMALE"));
     
+    // Status sistema di controllo
+    Serial.print(F("Modalità Controllo: "));
+    if (control_system.manual_mode) Serial.print(F("MANUALE "));
+    if (control_system.auto_mode) Serial.print(F("AUTOMATICA "));
+    if (control_system.temp_only_mode) Serial.print(F("SOLO-TEMP "));
+    Serial.println();
+    
     if (system_state.am2315_available || system_state.dht11_available) {
-        Serial.println(F("Modalità: Pronto per operazioni normali"));
+        Serial.println(F("Sistema: Pronto per operazioni normali"));
     } else {
         Serial.println(F("ATTENZIONE: Nessun sensore disponibile!"));
     }
@@ -1000,7 +1122,77 @@ void logSensorData() {
 }
 
 void updateControlSystem() {
-    // TODO: Implementazione completa nel prossimo step
+    // Non eseguire controlli in modalità emergenza (eccetto frigorifero)
+    if (system_state.emergency_mode) {
+        emergencyTemperatureControl();
+        return;
+    }
+    
+    // Verifica che abbiamo dati sensori validi
+    if (!validateSensorData()) {
+        Serial.println(F("CONTROLLO: Dati sensori non validi, skip controllo"));
+        return;
+    }
+    
+    // Controllo temperatura (priorità massima)
+    controlTemperature();
+    
+    // Controllo umidità (solo se non in modalità solo temperatura)
+    if (!control_system.temp_only_mode) {
+        controlHumidity();
+    }
+    
+    // Controllo ventilazione (se disponibile)
+    if (control_system.ventilation_available) {
+        controlVentilation();
+    }
+    
+    // Aggiorna statistiche attuatori
+    updateActuatorStatistics();
+}
+
+void emergencyTemperatureControl() {
+    // Controllo temperatura di emergenza: mantieni ~4°C
+    const float EMERGENCY_TARGET = 4.0;
+    const float EMERGENCY_HYSTERESIS = 1.0;
+    
+    if (sensors.internal_valid) {
+        // Temperature troppo alta - accendi frigorifero
+        if (sensors.temp_internal > EMERGENCY_TARGET + EMERGENCY_HYSTERESIS) {
+            if (canActivateActuator(&control_system.frigorifero, RELAY_FRIGORIFERO, 
+                                   MIN_FRIDGE_ON_TIME, MIN_FRIDGE_OFF_TIME)) {
+                activateActuator(&control_system.frigorifero, RELAY_FRIGORIFERO, true);
+                Serial.println(F("EMERGENZA: Frigorifero ON"));
+            }
+        }
+        // Temperatura OK - spegni frigorifero
+        else if (sensors.temp_internal < EMERGENCY_TARGET - EMERGENCY_HYSTERESIS) {
+            if (control_system.frigorifero.is_active) {
+                if (canDeactivateActuator(&control_system.frigorifero, MIN_FRIDGE_ON_TIME)) {
+                    activateActuator(&control_system.frigorifero, RELAY_FRIGORIFERO, false);
+                    Serial.println(F("EMERGENZA: Frigorifero OFF"));
+                }
+            }
+        }
+    }
+    
+    // Se temperatura esterna < interna, attiva ventola immissione
+    if (sensors.internal_valid && sensors.external_valid) {
+        if (sensors.temp_external < sensors.temp_internal - 2.0) {
+            if (canActivateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, 
+                                   MIN_FAN_ON_TIME, MIN_FAN_OFF_TIME)) {
+                activateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, true);
+                Serial.println(F("EMERGENZA: Ventola immissione ON"));
+            }
+        } else {
+            if (control_system.ventola_in.is_active) {
+                if (canDeactivateActuator(&control_system.ventola_in, MIN_FAN_ON_TIME)) {
+                    activateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, false);
+                    Serial.println(F("EMERGENZA: Ventola immissione OFF"));
+                }
+            }
+        }
+    }
 }
 
 void checkEmergencyConditions() {
@@ -1730,6 +1922,337 @@ void handleBuzzer() {
 
 void resetWatchdog() {
     wdt_reset();
+}
+
+void controlTemperature() {
+    unsigned long current_time = millis();
+    
+    // Controllo temporizzato per evitare switching troppo frequente
+    if (current_time - control_system.last_temp_control < CONTROL_FRIDGE_INTERVAL) {
+        return;
+    }
+    
+    control_system.last_temp_control = current_time;
+    
+    float current_temp = sensors.temp_internal;
+    float target_min = control_system.target_temp_min;
+    float target_max = control_system.target_temp_max;
+    float hysteresis = control_system.temp_hysteresis;
+    
+    // === CONTROLLO FRIGORIFERO ===
+    // Temperatura troppo alta - accendi frigorifero
+    if (current_temp > target_max + hysteresis) {
+        if (canActivateActuator(&control_system.frigorifero, RELAY_FRIGORIFERO, 
+                               MIN_FRIDGE_ON_TIME, MIN_FRIDGE_OFF_TIME)) {
+            activateActuator(&control_system.frigorifero, RELAY_FRIGORIFERO, true);
+            Serial.print(F("TEMP: Frigorifero ON ("));
+            Serial.print(current_temp, 1);
+            Serial.print(F("°C > "));
+            Serial.print(target_max + hysteresis, 1);
+            Serial.println(F("°C)"));
+        }
+    }
+    // Temperatura raggiunta - spegni frigorifero
+    else if (current_temp < target_max - hysteresis && control_system.frigorifero.is_active) {
+        if (canDeactivateActuator(&control_system.frigorifero, MIN_FRIDGE_ON_TIME)) {
+            activateActuator(&control_system.frigorifero, RELAY_FRIGORIFERO, false);
+            Serial.print(F("TEMP: Frigorifero OFF ("));
+            Serial.print(current_temp, 1);
+            Serial.print(F("°C < "));
+            Serial.print(target_max - hysteresis, 1);
+            Serial.println(F("°C)"));
+        }
+    }
+    
+    // === CONTROLLO RISCALDATORE ===
+    // Temperatura troppo bassa - accendi riscaldatore
+    if (current_temp < target_min - hysteresis) {
+        if (canActivateActuator(&control_system.riscaldatore, RELAY_RISCALDATORE, 
+                               MIN_HEATER_ON_TIME, MIN_HEATER_OFF_TIME)) {
+            activateActuator(&control_system.riscaldatore, RELAY_RISCALDATORE, true);
+            Serial.print(F("TEMP: Riscaldatore ON ("));
+            Serial.print(current_temp, 1);
+            Serial.print(F("°C < "));
+            Serial.print(target_min - hysteresis, 1);
+            Serial.println(F("°C)"));
+        }
+    }
+    // Temperatura raggiunta - spegni riscaldatore  
+    else if (current_temp > target_min + hysteresis && control_system.riscaldatore.is_active) {
+        if (canDeactivateActuator(&control_system.riscaldatore, MIN_HEATER_ON_TIME)) {
+            activateActuator(&control_system.riscaldatore, RELAY_RISCALDATORE, false);
+            Serial.print(F("TEMP: Riscaldatore OFF ("));
+            Serial.print(current_temp, 1);
+            Serial.print(F("°C > "));
+            Serial.print(target_min + hysteresis, 1);
+            Serial.println(F("°C)"));
+        }
+    }
+}
+
+void controlHumidity() {
+    unsigned long current_time = millis();
+    
+    // Controllo temporizzato
+    if (current_time - control_system.last_hum_control < CONTROL_HUM_INTERVAL) {
+        return;
+    }
+    
+    control_system.last_hum_control = current_time;
+    
+    float current_hum = sensors.hum_internal;
+    float target_min = control_system.target_hum_min;
+    float target_max = control_system.target_hum_max;
+    float hysteresis = control_system.hum_hysteresis;
+    
+    // === CONTROLLO DEUMIDIFICATORE ===
+    if (control_system.dehumidifier_available) {
+        // Umidità troppo alta - accendi deumidificatore
+        if (current_hum > target_max + hysteresis) {
+            if (canActivateActuator(&control_system.deumidificatore, RELAY_DEUMIDIFICATORE, 
+                                   MIN_DEHUM_ON_TIME, MIN_DEHUM_OFF_TIME)) {
+                activateActuator(&control_system.deumidificatore, RELAY_DEUMIDIFICATORE, true);
+                Serial.print(F("HUM: Deumidificatore ON ("));
+                Serial.print(current_hum, 1);
+                Serial.print(F("% > "));
+                Serial.print(target_max + hysteresis, 1);
+                Serial.println(F("%)"));
+            }
+        }
+        // Umidità raggiunta - spegni deumidificatore
+        else if (current_hum < target_max - hysteresis && control_system.deumidificatore.is_active) {
+            if (canDeactivateActuator(&control_system.deumidificatore, MIN_DEHUM_ON_TIME)) {
+                activateActuator(&control_system.deumidificatore, RELAY_DEUMIDIFICATORE, false);
+                Serial.print(F("HUM: Deumidificatore OFF ("));
+                Serial.print(current_hum, 1);
+                Serial.print(F("% < "));
+                Serial.print(target_max - hysteresis, 1);
+                Serial.println(F("%)"));
+            }
+        }
+    } else {
+        // Se non c'è deumidificatore, usa ventola estrazione per umidità alta
+        if (current_hum > target_max + hysteresis) {
+            if (canActivateActuator(&control_system.ventola_out, RELAY_VENTOLA_OUT, 
+                                   MIN_FAN_ON_TIME, MIN_FAN_OFF_TIME)) {
+                activateActuator(&control_system.ventola_out, RELAY_VENTOLA_OUT, true);
+                Serial.println(F("HUM: Ventola estrazione ON (no deumidificatore)"));
+            }
+        }
+    }
+    
+    // === CONTROLLO UMIDIFICATORE ===
+    if (control_system.humidifier_available) {
+        // Umidità troppo bassa - accendi umidificatore
+        if (current_hum < target_min - hysteresis) {
+            if (canActivateActuator(&control_system.umidificatore, RELAY_UMIDIFICATORE, 
+                                   MIN_HUM_ON_TIME, MIN_HUM_OFF_TIME)) {
+                activateActuator(&control_system.umidificatore, RELAY_UMIDIFICATORE, true);
+                Serial.print(F("HUM: Umidificatore ON ("));
+                Serial.print(current_hum, 1);
+                Serial.print(F("% < "));
+                Serial.print(target_min - hysteresis, 1);
+                Serial.println(F("%)"));
+            }
+        }
+        // Umidità raggiunta - spegni umidificatore
+        else if (current_hum > target_min + hysteresis && control_system.umidificatore.is_active) {
+            if (canDeactivateActuator(&control_system.umidificatore, MIN_HUM_ON_TIME)) {
+                activateActuator(&control_system.umidificatore, RELAY_UMIDIFICATORE, false);
+                Serial.print(F("HUM: Umidificatore OFF ("));
+                Serial.print(current_hum, 1);
+                Serial.print(F("% > "));
+                Serial.print(target_min + hysteresis, 1);
+                Serial.println(F("%)"));
+            }
+        }
+    } else {
+        // Se non c'è umidificatore, usa ventola immissione + frigorifero/riscaldatore
+        if (current_hum < target_min - hysteresis) {
+            // Strategia adattiva: se possibile crea umidità con temperatura
+            if (canActivateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, 
+                                   MIN_FAN_ON_TIME, MIN_FAN_OFF_TIME)) {
+                activateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, true);
+                Serial.println(F("HUM: Ventola immissione ON (no umidificatore)"));
+            }
+        }
+    }
+}
+
+void controlVentilation() {
+    unsigned long current_time = millis();
+    
+    // Controllo temporizzato ventilazione
+    if (current_time - control_system.last_vent_control < CONTROL_FAN_INTERVAL) {
+        return;
+    }
+    
+    control_system.last_vent_control = current_time;
+    
+    // Solo se entrambe le ventole sono disponibili
+    if (!control_system.ventilation_available) {
+        return;
+    }
+    
+    // Controllo ventilazione intelligente basata su condizioni esterne
+    if (sensors.internal_valid && sensors.external_valid) {
+        float temp_diff = sensors.temp_external - sensors.temp_internal;
+        float hum_diff = sensors.hum_external - sensors.hum_internal;
+        
+        // Ricircolo aria per migliorare condizioni
+        bool should_ventilate = false;
+        
+        // Se aria esterna è più favorevole per temperatura
+        if (abs(temp_diff) > 2.0) {
+            float target_temp = (control_system.target_temp_min + control_system.target_temp_max) / 2.0;
+            
+            // Se interno troppo caldo e esterno più fresco
+            if (sensors.temp_internal > target_temp && temp_diff < -1.0) {
+                should_ventilate = true;
+                Serial.println(F("VENT: Aria esterna più fresca"));
+            }
+            // Se interno troppo freddo e esterno più caldo
+            else if (sensors.temp_internal < target_temp && temp_diff > 1.0) {
+                should_ventilate = true;
+                Serial.println(F("VENT: Aria esterna più calda"));
+            }
+        }
+        
+        // Attiva/disattiva ventilazione coordinata
+        if (should_ventilate) {
+            if (canActivateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, 
+                                   MIN_FAN_ON_TIME, MIN_FAN_OFF_TIME) &&
+                canActivateActuator(&control_system.ventola_out, RELAY_VENTOLA_OUT, 
+                                   MIN_FAN_ON_TIME, MIN_FAN_OFF_TIME)) {
+                
+                activateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, true);
+                activateActuator(&control_system.ventola_out, RELAY_VENTOLA_OUT, true);
+                Serial.println(F("VENT: Ricircolo aria attivato"));
+            }
+        } else {
+            // Spegni ventilazione se non necessaria
+            if (control_system.ventola_in.is_active && control_system.ventola_out.is_active) {
+                if (canDeactivateActuator(&control_system.ventola_in, MIN_FAN_ON_TIME) &&
+                    canDeactivateActuator(&control_system.ventola_out, MIN_FAN_ON_TIME)) {
+                    
+                    activateActuator(&control_system.ventola_in, RELAY_VENTOLA_IN, false);
+                    activateActuator(&control_system.ventola_out, RELAY_VENTOLA_OUT, false);
+                    Serial.println(F("VENT: Ricircolo aria disattivato"));
+                }
+            }
+        }
+    }
+}
+
+// ===============================================================================
+// FUNZIONI SUPPORTO CONTROLLO ATTUATORI
+// ===============================================================================
+
+bool canActivateActuator(ActuatorState* actuator, int relay_pin, 
+                        unsigned long min_on_time, unsigned long min_off_time) {
+    unsigned long current_time = millis();
+    
+    // Se già attivo, non serve riattivare
+    if (actuator->is_active) {
+        return false;
+    }
+    
+    // Controlla tempo minimo OFF
+    unsigned long time_since_off = current_time - actuator->last_change_time;
+    if (time_since_off < min_off_time) {
+        actuator->protection_active = true;
+        return false;
+    }
+    
+    actuator->protection_active = false;
+    return true;
+}
+
+bool canDeactivateActuator(ActuatorState* actuator, unsigned long min_on_time) {
+    unsigned long current_time = millis();
+    
+    // Se già spento, non serve riattivare
+    if (!actuator->is_active) {
+        return false;
+    }
+    
+    // Controlla tempo minimo ON
+    unsigned long time_since_on = current_time - actuator->last_change_time;
+    if (time_since_on < min_on_time) {
+        actuator->protection_active = true;
+        return false;
+    }
+    
+    actuator->protection_active = false;
+    return true;
+}
+
+void activateActuator(ActuatorState* actuator, int relay_pin, bool activate) {
+    unsigned long current_time = millis();
+    
+    // Aggiorna statistiche tempo
+    if (actuator->is_active && !activate) {
+        // Spegnimento: aggiungi tempo ON
+        actuator->total_on_time += current_time - actuator->last_change_time;
+    } else if (!actuator->is_active && activate) {
+        // Accensione: aggiungi tempo OFF
+        actuator->total_off_time += current_time - actuator->last_change_time;
+    }
+    
+    // Cambia stato attuatore
+    actuator->is_active = activate;
+    actuator->last_change_time = current_time;
+    actuator->protection_active = false;
+    
+    // Controlla relè (logica invertita: LOW = ON, HIGH = OFF)
+    digitalWrite(relay_pin, activate ? LOW : HIGH);
+    
+    // Debug
+    Serial.print(F("RELAY PIN "));
+    Serial.print(relay_pin);
+    Serial.print(F(": "));
+    Serial.println(activate ? F("ON") : F("OFF"));
+}
+
+void updateActuatorStatistics() {
+    // Aggiorna statistiche per tutti gli attuatori attivi
+    unsigned long current_time = millis();
+    
+    // Solo log periodico per evitare spam
+    static unsigned long last_stats_log = 0;
+    if (current_time - last_stats_log > 300000) { // Ogni 5 minuti
+        last_stats_log = current_time;
+        
+        Serial.println(F("=== STATISTICHE ATTUATORI (ultimi 5min) ==="));
+        logActuatorStats(F("Frigorifero"), &control_system.frigorifero);
+        logActuatorStats(F("Riscaldatore"), &control_system.riscaldatore);
+        logActuatorStats(F("Deumidificatore"), &control_system.deumidificatore);
+        logActuatorStats(F("Umidificatore"), &control_system.umidificatore);
+        logActuatorStats(F("Ventola IN"), &control_system.ventola_in);
+        logActuatorStats(F("Ventola OUT"), &control_system.ventola_out);
+    }
+}
+
+void logActuatorStats(const __FlashStringHelper* name, ActuatorState* actuator) {
+    unsigned long current_time = millis();
+    unsigned long total_time = actuator->total_on_time + actuator->total_off_time;
+    
+    if (actuator->is_active) {
+        total_time += current_time - actuator->last_change_time;
+    }
+    
+    if (total_time > 0) {
+        float duty_cycle = (float)actuator->total_on_time / total_time * 100.0;
+        Serial.print(name);
+        Serial.print(F(": "));
+        Serial.print(duty_cycle, 1);
+        Serial.print(F("% duty, "));
+        Serial.print(actuator->is_active ? F("ON") : F("OFF"));
+        if (actuator->protection_active) {
+            Serial.print(F(" [PROTECTED]"));
+        }
+        Serial.println();
+    }
 }
 
 void handleMillisOverflow() {
