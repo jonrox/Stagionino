@@ -354,6 +354,45 @@ struct AlarmSystem {
     bool critical_alarm;              // Allarme critico
 };
 
+// Enumerazione modalità LED
+enum LEDMode {
+    LED_MODE_NORMAL,                  // Modalità normale
+    LED_MODE_EMERGENCY,               // Modalità emergenza
+    LED_MODE_PROGRAM_RUNNING,         // Programma in esecuzione
+    LED_MODE_STARTUP,                 // Avvio sistema
+    LED_MODE_ERROR,                   // Errore sistema
+    LED_MODE_MAINTENANCE             // Manutenzione
+};
+
+// Struttura gestione LED avanzata
+struct LEDSystem {
+    LEDMode current_mode;             // Modalità corrente
+    bool leds_enabled;                // LED abilitati
+    uint8_t brightness;               // Luminosità (0-255)
+    bool animation_active;            // Animazione in corso
+    unsigned long animation_start;    // Inizio animazione
+    int animation_step;               // Step animazione corrente
+    unsigned long last_update;        // Ultimo aggiornamento
+    
+    // Pattern LED
+    int led_pattern;                  // Pattern corrente
+    unsigned long pattern_duration;   // Durata pattern
+    bool auto_cycle;                  // Ciclo automatico pattern
+    
+    // Indicatori status
+    CRGB status_colors[6];            // Colori per ogni attuatore
+    bool status_blink[6];             // Blink per ogni attuatore
+    unsigned long last_blink_time;    // Ultimo blink
+    bool blink_state;                 // Stato corrente blink
+    
+    // Effetti speciali
+    bool rainbow_effect;              // Effetto arcobaleno
+    uint8_t rainbow_hue;              // Hue arcobaleno corrente
+    bool breathing_effect;            // Effetto breathing
+    uint8_t breathing_value;          // Valore breathing corrente
+    bool breathing_direction;         // Direzione breathing
+};
+
 // ===============================================================================
 // DICHIARAZIONE OGGETTI HARDWARE
 // ===============================================================================
@@ -385,6 +424,7 @@ ProgramExecution program_execution; // Esecuzione programma
 SDManager sd_manager;               // Gestione SD card
 EmergencySystem emergency_system;   // Sistema emergenze
 AlarmSystem alarm_system;           // Sistema allarmi
+LEDSystem led_system;               // Sistema LED avanzato
 
 // ===============================================================================
 // FORWARD DECLARATIONS
@@ -441,6 +481,24 @@ void updateDisplay();
 void handleTouch();
 void updateLEDs();
 void handleBuzzer();
+
+// Sistema LED avanzato
+void playStartupAnimation();
+void updateLEDMode();
+void updateNormalLEDs();
+void updateEmergencyLEDs();
+void updateProgramLEDs();
+void updateErrorLEDs();
+void updateMaintenanceLEDs();
+void updateSystemStatusLEDs();
+ActuatorState* getActuatorState(int actuator_index);
+const char* getLEDModeName(LEDMode mode);
+
+// Effetti LED
+void applyRainbowEffect();
+void applyBreathingEffect();
+void toggleLEDs();
+void setBrightness(uint8_t brightness);
 
 // Sistema touch avanzato
 bool processTouchDebounce();
@@ -1019,40 +1077,51 @@ void initializeLEDs() {
     // Configurazione LED strip 12bit (secondario)  
     FastLED.addLeds<WS2812B, LED_12BIT_PIN, GRB>(leds_12, NUM_LEDS_12);
     
-    // Impostazione luminosità globale (50% per evitare sovraccarico)
-    FastLED.setBrightness(128);
+    // Inizializzazione sistema LED avanzato
+    led_system.current_mode = LED_MODE_STARTUP;
+    led_system.leds_enabled = true;
+    led_system.brightness = 128;                  // 50% luminosità default
+    led_system.animation_active = false;
+    led_system.animation_start = 0;
+    led_system.animation_step = 0;
+    led_system.last_update = millis();
     
-    // Test LED - sequenza di avvio
-    Serial.println(F("     Test sequenza LED..."));
+    // Pattern LED
+    led_system.led_pattern = 0;
+    led_system.pattern_duration = 2000;           // 2 secondi default
+    led_system.auto_cycle = false;
     
-    // Spegni tutti i LED
-    fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
-    fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
-    FastLED.show();
-    delay(200);
+    // Inizializza colori attuatori
+    led_system.status_colors[0] = CRGB::Blue;     // Frigorifero
+    led_system.status_colors[1] = CRGB::Red;      // Riscaldatore  
+    led_system.status_colors[2] = CRGB::Orange;   // Deumidificatore
+    led_system.status_colors[3] = CRGB::Cyan;     // Umidificatore
+    led_system.status_colors[4] = CRGB::Green;    // Ventola IN
+    led_system.status_colors[5] = CRGB::Green;    // Ventola OUT
     
-    // Test LED 24bit - Verde
-    fill_solid(leds_24, NUM_LEDS_24, CRGB::Green);
-    FastLED.show();
-    delay(500);
-    fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
-    FastLED.show();
+    // Reset blink status
+    for (int i = 0; i < 6; i++) {
+        led_system.status_blink[i] = false;
+    }
+    led_system.last_blink_time = millis();
+    led_system.blink_state = false;
     
-    // Test LED 12bit - Blu
-    fill_solid(leds_12, NUM_LEDS_12, CRGB::Blue);
-    FastLED.show();
-    delay(500);
-    fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
-    FastLED.show();
+    // Effetti speciali
+    led_system.rainbow_effect = false;
+    led_system.rainbow_hue = 0;
+    led_system.breathing_effect = false;
+    led_system.breathing_value = 0;
+    led_system.breathing_direction = true;
     
-    // Entrambi - Bianco breve
-    fill_solid(leds_24, NUM_LEDS_24, CRGB::White);
-    fill_solid(leds_12, NUM_LEDS_12, CRGB::White);
-    FastLED.show();
-    delay(200);
-    fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
-    fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
-    FastLED.show();
+    // Impostazione luminosità globale
+    FastLED.setBrightness(led_system.brightness);
+    
+    // Sequenza avvio animata
+    Serial.println(F("     Sequenza avvio LED..."));
+    playStartupAnimation();
+    
+    // Passa a modalità normale
+    led_system.current_mode = LED_MODE_NORMAL;
     
     Serial.print(F("     LED Strip 24bit: "));
     Serial.print(NUM_LEDS_24);
@@ -2468,7 +2537,98 @@ void updateUIColors() {
 }
 
 void updateLEDs() {
-    // TODO: Implementazione completa nel prossimo step
+    if (!led_system.leds_enabled) {
+        return;
+    }
+    
+    unsigned long current_time = millis();
+    
+    // Aggiorna modalità LED in base allo stato sistema
+    updateLEDMode();
+    
+    // Gestione blink per status attuatori
+    if (current_time - led_system.last_blink_time >= 500) {
+        led_system.blink_state = !led_system.blink_state;
+        led_system.last_blink_time = current_time;
+    }
+    
+    // Aggiorna LED in base alla modalità corrente
+    switch (led_system.current_mode) {
+        case LED_MODE_NORMAL:
+            updateNormalLEDs();
+            break;
+            
+        case LED_MODE_EMERGENCY:
+            updateEmergencyLEDs();
+            break;
+            
+        case LED_MODE_PROGRAM_RUNNING:
+            updateProgramLEDs();
+            break;
+            
+        case LED_MODE_ERROR:
+            updateErrorLEDs();
+            break;
+            
+        case LED_MODE_MAINTENANCE:
+            updateMaintenanceLEDs();
+            break;
+            
+        case LED_MODE_STARTUP:
+            // Gestito da playStartupAnimation()
+            break;
+    }
+    
+    // Effetti speciali globali
+    if (led_system.rainbow_effect) {
+        applyRainbowEffect();
+    }
+    
+    if (led_system.breathing_effect) {
+        applyBreathingEffect();
+    }
+    
+    // Aggiorna display LED
+    FastLED.show();
+    led_system.last_update = current_time;
+}
+
+void updateLEDMode() {
+    LEDMode new_mode = LED_MODE_NORMAL;
+    
+    // Priorità modalità (più alta = più importante)
+    if (emergency_system.is_active) {
+        new_mode = LED_MODE_EMERGENCY;
+    } else if (program_execution.is_running) {
+        new_mode = LED_MODE_PROGRAM_RUNNING;
+    } else if (!system_state.am2315_available && !system_state.dht11_available) {
+        new_mode = LED_MODE_ERROR;
+    } else {
+        new_mode = LED_MODE_NORMAL;
+    }
+    
+    // Cambio modalità con animazione
+    if (led_system.current_mode != new_mode) {
+        led_system.current_mode = new_mode;
+        led_system.animation_active = true;
+        led_system.animation_start = millis();
+        led_system.animation_step = 0;
+        
+        Serial.print(F("LED: Cambio modalità -> "));
+        Serial.println(getLEDModeName(new_mode));
+    }
+}
+
+const char* getLEDModeName(LEDMode mode) {
+    switch (mode) {
+        case LED_MODE_NORMAL: return "Normale";
+        case LED_MODE_EMERGENCY: return "Emergenza";
+        case LED_MODE_PROGRAM_RUNNING: return "Programma";
+        case LED_MODE_STARTUP: return "Avvio";
+        case LED_MODE_ERROR: return "Errore";
+        case LED_MODE_MAINTENANCE: return "Manutenzione";
+        default: return "Sconosciuta";
+    }
 }
 
 void updateAlarmSystem() {
@@ -3434,8 +3594,295 @@ void logProgramStatus() {
     }
 }
 
+// ===============================================================================
+// FUNZIONI LED SPECIFICHE PER MODALITÀ
+// ===============================================================================
+
+void playStartupAnimation() {
+    // Animazione avvio con wave effect
+    for (int wave = 0; wave < 3; wave++) {
+        // Wave da sinistra a destra su strip 24
+        for (int i = 0; i < NUM_LEDS_24; i++) {
+            fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
+            leds_24[i] = CHSV(wave * 85, 255, 255); // Rosso, Verde, Blu
+            if (i > 0) leds_24[i-1] = CHSV(wave * 85, 255, 128);
+            if (i > 1) leds_24[i-2] = CHSV(wave * 85, 255, 64);
+            FastLED.show();
+            delay(50);
+        }
+        
+        // Wave su strip 12
+        for (int i = 0; i < NUM_LEDS_12; i++) {
+            fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
+            leds_12[i] = CHSV(wave * 85 + 128, 255, 255);
+            FastLED.show();
+            delay(30);
+        }
+    }
+    
+    // Flash finale
+    fill_solid(leds_24, NUM_LEDS_24, CRGB::White);
+    fill_solid(leds_12, NUM_LEDS_12, CRGB::White);
+    FastLED.show();
+    delay(200);
+    fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
+    fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
+    FastLED.show();
+}
+
+void updateNormalLEDs() {
+    // Strip 24: Status attuatori (6 gruppi di 4 LED)
+    int leds_per_actuator = NUM_LEDS_24 / 6;
+    
+    for (int actuator = 0; actuator < 6; actuator++) {
+        CRGB color = CRGB::Black;
+        bool is_active = false;
+        
+        // Determina stato attuatore
+        switch (actuator) {
+            case 0: is_active = control_system.frigorifero.is_active; break;
+            case 1: is_active = control_system.riscaldatore.is_active; break;
+            case 2: is_active = control_system.deumidificatore.is_active; break;
+            case 3: is_active = control_system.umidificatore.is_active; break;
+            case 4: is_active = control_system.ventola_in.is_active; break;
+            case 5: is_active = control_system.ventola_out.is_active; break;
+        }
+        
+        // Applica colore e blink se necessario
+        if (is_active) {
+            color = led_system.status_colors[actuator];
+            
+            // Blink se in protezione
+            ActuatorState* state = getActuatorState(actuator);
+            if (state && state->protection_active && led_system.blink_state) {
+                color = CRGB::Black;
+            }
+        }
+        
+        // Applica colore al gruppo LED
+        for (int i = 0; i < leds_per_actuator; i++) {
+            int led_index = actuator * leds_per_actuator + i;
+            if (led_index < NUM_LEDS_24) {
+                leds_24[led_index] = color;
+            }
+        }
+    }
+    
+    // Strip 12: Indicatori sistema
+    updateSystemStatusLEDs();
+}
+
+void updateEmergencyLEDs() {
+    unsigned long elapsed = millis() - led_system.animation_start;
+    
+    // Pattern lampeggiante rosso/giallo alternato
+    CRGB emergency_color = (elapsed % 1000 < 500) ? CRGB::Red : CRGB::Yellow;
+    
+    // Strip 24: tutto del colore emergenza
+    fill_solid(leds_24, NUM_LEDS_24, emergency_color);
+    
+    // Strip 12: pattern alternato
+    for (int i = 0; i < NUM_LEDS_12; i++) {
+        leds_12[i] = ((i + (elapsed / 200)) % 2 == 0) ? CRGB::Red : CRGB::Black;
+    }
+}
+
+void updateProgramLEDs() {
+    // Strip 24: Progress bar programma
+    if (program_execution.current_program && program_execution.current_phase < program_execution.current_program->total_phases) {
+        ProgramPhase* phase = &program_execution.current_program->phases[program_execution.current_phase];
+        
+        // Calcola progresso fase corrente
+        float progress = 0.0;
+        if (phase->duration_hours > 0) {
+            unsigned long elapsed = millis() - program_execution.phase_start_time;
+            unsigned long phase_duration_ms = phase->duration_hours * 3600000UL;
+            progress = (float)elapsed / phase_duration_ms;
+            if (progress > 1.0) progress = 1.0;
+        } else {
+            // Fase infinita - effetto breathing
+            progress = (sin(millis() / 2000.0) + 1.0) / 2.0;
+        }
+        
+        // Visualizza progresso
+        int active_leds = (int)(progress * NUM_LEDS_24);
+        CRGB phase_color = CHSV(program_execution.current_phase * 40, 255, 255);
+        
+        for (int i = 0; i < NUM_LEDS_24; i++) {
+            if (i < active_leds) {
+                leds_24[i] = phase_color;
+            } else {
+                leds_24[i] = CRGB::Black;
+            }
+        }
+    }
+    
+    // Strip 12: Status attuatori semplificato  
+    updateSystemStatusLEDs();
+}
+
+void updateErrorLEDs() {
+    unsigned long elapsed = millis() - led_system.animation_start;
+    
+    // Pattern errore: rosso lampeggiante lento
+    bool error_state = (elapsed % 2000) < 1000;
+    
+    fill_solid(leds_24, NUM_LEDS_24, error_state ? CRGB::Red : CRGB::Black);
+    fill_solid(leds_12, NUM_LEDS_12, error_state ? CRGB::Red : CRGB::Black);
+}
+
+void updateMaintenanceLEDs() {
+    // Pattern manutenzione: arancione rotante
+    unsigned long elapsed = millis() - led_system.animation_start;
+    int rotation = (elapsed / 100) % NUM_LEDS_24;
+    
+    fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
+    fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
+    
+    // LED rotanti
+    for (int i = 0; i < 4; i++) {
+        int pos = (rotation + i * 6) % NUM_LEDS_24;
+        leds_24[pos] = CRGB::Orange;
+    }
+    
+    // Strip 12 sincrono
+    int pos_12 = (rotation / 2) % NUM_LEDS_12;
+    leds_12[pos_12] = CRGB::Orange;
+}
+
+void updateSystemStatusLEDs() {
+    // Strip 12: Indicatori sistema (sensori, SD, RTC, etc.)
+    leds_12[0] = sensors.internal_valid ? CRGB::Green : CRGB::Red;        // Sensore interno
+    leds_12[1] = sensors.external_valid ? CRGB::Green : CRGB::Yellow;     // Sensore esterno
+    leds_12[2] = system_state.rtc_available ? CRGB::Green : CRGB::Red;    // RTC
+    leds_12[3] = system_state.sd_available ? CRGB::Green : CRGB::Red;     // SD Card
+    
+    // Temperatura range (LED 4-7)
+    if (sensors.internal_valid) {
+        float temp_avg = (control_system.target_temp_min + control_system.target_temp_max) / 2.0;
+        float temp_diff = sensors.temp_internal - temp_avg;
+        
+        if (abs(temp_diff) < 0.5) {
+            leds_12[4] = CRGB::Green;    // Perfetto
+        } else if (abs(temp_diff) < 2.0) {
+            leds_12[4] = CRGB::Yellow;   // OK
+        } else {
+            leds_12[4] = CRGB::Red;      // Fuori range
+        }
+    } else {
+        leds_12[4] = CRGB::Black;
+    }
+    
+    // Umidità range (LED 5-7)
+    if (sensors.internal_valid && !control_system.temp_only_mode) {
+        float hum_avg = (control_system.target_hum_min + control_system.target_hum_max) / 2.0;
+        float hum_diff = sensors.hum_internal - hum_avg;
+        
+        if (abs(hum_diff) < 2.0) {
+            leds_12[5] = CRGB::Green;    // Perfetto
+        } else if (abs(hum_diff) < 5.0) {
+            leds_12[5] = CRGB::Yellow;   // OK
+        } else {
+            leds_12[5] = CRGB::Red;      // Fuori range
+        }
+    } else {
+        leds_12[5] = control_system.temp_only_mode ? CRGB::Blue : CRGB::Black; // Blu se solo temp
+    }
+    
+    // Modalità sistema (LED 6-11)
+    leds_12[6] = control_system.manual_mode ? CRGB::Blue : CRGB::Black;
+    leds_12[7] = control_system.auto_mode ? CRGB::Purple : CRGB::Black;
+    leds_12[8] = emergency_system.is_active ? CRGB::Red : CRGB::Black;
+    leds_12[9] = program_execution.is_running ? CRGB::Green : CRGB::Black;
+    
+    // Heartbeat (LED 10-11)
+    bool heartbeat = (millis() % 2000) < 100;
+    leds_12[10] = heartbeat ? CRGB::White : CRGB::Black;
+    leds_12[11] = heartbeat ? CRGB::White : CRGB::Black;
+}
+
+ActuatorState* getActuatorState(int actuator_index) {
+    switch (actuator_index) {
+        case 0: return &control_system.frigorifero;
+        case 1: return &control_system.riscaldatore;
+        case 2: return &control_system.deumidificatore;
+        case 3: return &control_system.umidificatore;
+        case 4: return &control_system.ventola_in;
+        case 5: return &control_system.ventola_out;
+        default: return nullptr;
+    }
+}
+
+// ===============================================================================
+// EFFETTI SPECIALI LED
+// ===============================================================================
+
+void applyRainbowEffect() {
+    led_system.rainbow_hue += 2;
+    if (led_system.rainbow_hue >= 255) led_system.rainbow_hue = 0;
+    
+    // Applica arcobaleno solo alla strip 24
+    for (int i = 0; i < NUM_LEDS_24; i++) {
+        leds_24[i] = CHSV(led_system.rainbow_hue + (i * 255 / NUM_LEDS_24), 255, 200);
+    }
+}
+
+void applyBreathingEffect() {
+    // Effetto breathing sulla luminosità
+    if (led_system.breathing_direction) {
+        led_system.breathing_value += 5;
+        if (led_system.breathing_value >= 255) {
+            led_system.breathing_value = 255;
+            led_system.breathing_direction = false;
+        }
+    } else {
+        led_system.breathing_value -= 5;
+        if (led_system.breathing_value <= 50) {
+            led_system.breathing_value = 50;
+            led_system.breathing_direction = true;
+        }
+    }
+    
+    FastLED.setBrightness(led_system.breathing_value);
+}
+
+void toggleLEDs() {
+    led_system.leds_enabled = !led_system.leds_enabled;
+    
+    if (!led_system.leds_enabled) {
+        fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
+        fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
+        FastLED.show();
+    }
+    
+    Serial.print(F("LED "));
+    Serial.println(led_system.leds_enabled ? F("ABILITATI") : F("DISABILITATI"));
+}
+
+void setBrightness(uint8_t brightness) {
+    led_system.brightness = brightness;
+    FastLED.setBrightness(brightness);
+    
+    Serial.print(F("LED luminosità: "));
+    Serial.print((brightness * 100) / 255);
+    Serial.println(F("%"));
+}
+
 void handleMillisOverflow() {
-    // TODO: Implementazione gestione overflow millis()
+    // Gestione overflow millis() per tutti i timer LED
+    unsigned long current_time = millis();
+    
+    // Controlla se millis() ha fatto overflow (torna a 0)
+    static unsigned long last_millis = 0;
+    if (current_time < last_millis) {
+        // Overflow rilevato - aggiorna tutti i timestamp LED
+        led_system.animation_start = current_time;
+        led_system.last_update = current_time;
+        led_system.last_blink_time = current_time;
+        
+        Serial.println(F("Overflow millis() gestito - Timer LED aggiornati"));
+    }
+    last_millis = current_time;
 }
 
 // ===============================================================================
