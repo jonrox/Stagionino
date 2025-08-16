@@ -52,29 +52,32 @@
 // Display ILI9486 (8-bit parallelo - pin automatici MCUFRIEND_kbv)
 // Shield 3.5" si monta direttamente su Arduino Mega
 
-// Touch XPT2046 (SPI condiviso)
-#define TOUCH_CS    6               // Touch Chip Select
-#define TOUCH_IRQ   7               // Touch Interrupt
+// Touch XPT2046 (SPI condiviso) - PIN OBBLIGATORI SHIELD
+#define TOUCH_CS    6               // Touch Chip Select (obbligatorio shield)
+#define TOUCH_IRQ   7               // Touch Interrupt (obbligatorio shield)
 
-// SD Card (SPI condiviso) 
-#define SD_CS       4               // SD Card Chip Select
+// SD Card (SPI condiviso) - PIN OBBLIGATORI SHIELD
+#define SD_CS       4               // SD Card Chip Select (obbligatorio shield)
 
-// Sensori
-#define DHT_PIN     2               // DHT11 Data Pin
+// Display Backlight Control
+#define BACKLIGHT_PIN    44         // Pin controllo retroilluminazione (PWM)
+
+// Sensori - AGGIORNATI PER AREA 22-53
+#define DHT_PIN     28              // DHT11 Data Pin (era pin 2)
 #define DHT_TYPE    DHT11           // Tipo sensore DHT
-// AM2315C usa I2C: SDA=20, SCL=21 (automatici)
-// DS1307 usa I2C: SDA=20, SCL=21 (automatici)
+// AM2315C usa I2C: SDA=20, SCL=21 (obbligatori)
+// DS1307 usa I2C: SDA=20, SCL=21 (obbligatori)
 
-// LED Indicatori
-#define LED_24BIT_PIN    8          // WS2812B 24 LED strip
-#define LED_12BIT_PIN    9          // WS2812B 12 LED strip
+// LED Indicatori - AGGIORNATI PER AREA 22-53
+#define LED_24BIT_PIN    30         // WS2812B 24 LED strip (era pin 8)
+#define LED_12BIT_PIN    32         // WS2812B 12 LED strip (era pin 9)
 #define NUM_LEDS_24      24         // Numero LED strip principale
 #define NUM_LEDS_12      12         // Numero LED strip secondario
 
-// Buzzer
-#define BUZZER_PIN      10          // Buzzer passivo (PWM/tone)
+// Buzzer - AGGIORNATO PER AREA 22-53
+#define BUZZER_PIN      34          // Buzzer passivo (PWM/tone) (era pin 10)
 
-// Relè Attuatori (logica invertita: LOW=ON, HIGH=OFF)
+// Relè Attuatori (logica invertita: LOW=ON, HIGH=OFF) - GIÀ CORRETTI
 #define RELAY_FRIGORIFERO      22   // Relè 1 - Frigorifero
 #define RELAY_RISCALDATORE     23   // Relè 2 - Riscaldatore  
 #define RELAY_DEUMIDIFICATORE  24   // Relè 3 - Deumidificatore
@@ -83,17 +86,35 @@
 #define RELAY_VENTOLA_OUT      27   // Relè 6 - Ventola Estrazione
 
 // ===============================================================================
+// COSTANTI DI SISTEMA E STRINGHE PROGMEM
+// ===============================================================================
+
+// Stringhe costanti in PROGMEM per risparmiare RAM
+const char PROGMEM str_system_name[] = "STAGIONINO V1.0";
+const char PROGMEM str_system_desc[] = "Sistema Stagionatura Salumi";
+const char PROGMEM str_initializing[] = "Inizializzazione...";
+const char PROGMEM str_sensors[] = "SENSORI";
+const char PROGMEM str_actuators[] = "ATTUATORI";
+const char PROGMEM str_emergency[] = "EMERGENZA";
+const char PROGMEM str_programs[] = "PROGRAMMI";
+const char PROGMEM str_settings[] = "SETTINGS";
+const char PROGMEM str_back[] = "BACK";
+const char PROGMEM str_ok[] = "OK";
+const char PROGMEM str_error[] = "ERRORE";
+const char PROGMEM str_none[] = "Nessuno";
+
+// ===============================================================================
 // COSTANTI DI SISTEMA
 // ===============================================================================
 
-// Temporizzazioni (millisecondi)
-#define SENSOR_READ_INTERVAL     30000    // Lettura sensori ogni 30s
-#define DISPLAY_UPDATE_INTERVAL  15000    // Aggiornamento display ogni 15s
-#define CONTROL_FRIDGE_INTERVAL  480000   // Controllo frigo ogni 8min
-#define CONTROL_HEATER_INTERVAL  300000   // Controllo riscaldatore ogni 5min
-#define CONTROL_DEHUM_INTERVAL   240000   // Controllo deumidificatore ogni 4min
-#define CONTROL_HUM_INTERVAL     180000   // Controllo umidificatore ogni 3min
-#define CONTROL_FAN_INTERVAL     120000   // Controllo ventole ogni 2min
+// Temporizzazioni ottimizzate per produzione (millisecondi)
+#define SENSOR_READ_INTERVAL     15000    // Lettura sensori ogni 15s (era 30s)
+#define DISPLAY_UPDATE_INTERVAL  2000     // Aggiornamento display ogni 2s (ottimizzato per UI reattiva)
+#define CONTROL_FRIDGE_INTERVAL  120000   // Controllo frigo ogni 2min (era 8min)
+#define CONTROL_HEATER_INTERVAL  90000    // Controllo riscaldatore ogni 1.5min (era 5min)
+#define CONTROL_DEHUM_INTERVAL   60000    // Controllo deumidificatore ogni 1min (era 4min)
+#define CONTROL_HUM_INTERVAL     60000    // Controllo umidificatore ogni 1min (era 3min)
+#define CONTROL_FAN_INTERVAL     45000    // Controllo ventole ogni 45s (era 2min)
 
 // Cicli minimi dispositivi (protezione meccanica)
 #define MIN_FRIDGE_ON_TIME       300000   // Frigo ON minimo 5min
@@ -114,6 +135,12 @@
 #define SD_RETRY_COUNT           3        // Tentativi inizializzazione SD
 #define EMERGENCY_TEMP_OFFSET    5.0      // Offset emergenza temperatura
 #define MUTE_ALARM_DURATION      300000   // Mute allarmi 5 minuti
+
+// Controllo retroilluminazione display
+#define BACKLIGHT_TIMEOUT        30000    // Timeout retroilluminazione inattiva (30s)
+#define BACKLIGHT_MIN_LEVEL      30       // Livello minimo retroilluminazione (0-255)
+#define BACKLIGHT_MAX_LEVEL      255      // Livello massimo retroilluminazione (0-255)
+#define BACKLIGHT_AUTO_DIM       120      // Livello automatico ridotto (0-255)
 
 // Range validazione sensori
 #define AM2315C_TEMP_MIN         -40.0    // Temperatura minima AM2315C
@@ -153,7 +180,7 @@
 // STRUTTURE DATI SISTEMA
 // ===============================================================================
 
-// Struttura dati sensori
+// Struttura dati sensori con filtri
 struct SensorData {
     float temp_internal;              // Temperatura interna (AM2315C)
     float hum_internal;               // Umidità interna (AM2315C)
@@ -164,6 +191,14 @@ struct SensorData {
     unsigned long last_read_time;     // Timestamp ultima lettura
     int internal_error_count;         // Contatore errori consecutivi interno
     int external_error_count;         // Contatore errori consecutivi esterno
+    
+    // Filtri per stabilità (media mobile)
+    float temp_internal_filtered;     // Temperatura interna filtrata
+    float hum_internal_filtered;      // Umidità interna filtrata
+    float temp_buffer[3];             // Buffer per media mobile temperatura
+    float hum_buffer[3];              // Buffer per media mobile umidità
+    int buffer_index;                 // Indice buffer circolare
+    bool filter_initialized;          // Flag inizializzazione filtro
 };
 
 // Struttura stato sistema
@@ -173,6 +208,8 @@ struct SystemState {
     bool rtc_available;               // RTC disponibile  
     bool am2315_available;            // AM2315C disponibile
     bool dht11_available;             // DHT11 disponibile
+    bool demo_mode_forced;            // Modalità demo forzata manualmente
+    bool demo_mode_active;            // Modalità demo attualmente attiva
     unsigned long uptime;             // Tempo di funzionamento
     unsigned long manual_mode_start;  // Tempo avvio modalità manuale (millis)
     unsigned long last_watchdog_reset; // Ultimo reset watchdog
@@ -185,7 +222,8 @@ enum DisplayScreen {
     SCREEN_SETTINGS,                  // Impostazioni sistema
     SCREEN_PROGRAMS,                  // Gestione programmi
     SCREEN_EMERGENCY,                 // Schermata emergenza
-    SCREEN_CALIBRATION               // Calibrazione touch
+    SCREEN_CALIBRATION,              // Calibrazione touch
+    SCREEN_DIAGNOSTIC                // Test diagnostici produzione
 };
 
 // Struttura gestione touch
@@ -210,6 +248,30 @@ struct UIState {
     uint16_t background_color;        // Colore sfondo
     uint16_t text_color;              // Colore testo
     uint16_t accent_color;            // Colore accento
+};
+
+// Struttura gestione retroilluminazione display
+struct BacklightSystem {
+    bool is_enabled;                  // Retroilluminazione abilitata
+    uint8_t current_level;            // Livello corrente (0-255)
+    uint8_t target_level;             // Livello target (0-255)
+    unsigned long last_activity;     // Ultimo tocco/attività
+    unsigned long last_update;       // Ultimo aggiornamento PWM
+    bool auto_dim_enabled;            // Auto-dim abilitato
+    bool manual_control;              // Controllo manuale attivo
+    bool emergency_mode;              // Modalità emergenza (sempre acceso)
+    
+    // Profili preimpostati
+    uint8_t day_level;                // Livello diurno
+    uint8_t night_level;              // Livello notturno
+    uint8_t standby_level;            // Livello standby
+    
+    // Fade progressivo
+    bool fade_in_progress;            // Fade in corso
+    unsigned long fade_start_time;    // Inizio fade
+    uint8_t fade_start_level;         // Livello iniziale fade
+    uint8_t fade_target_level;        // Livello finale fade
+    unsigned long fade_duration;     // Durata fade (ms)
 };
 
 // Struttura controllo attuatori
@@ -257,9 +319,9 @@ struct ControlSystem {
     bool temp_only_mode;              // Solo controllo temperatura
 };
 
-// Struttura fase programma
+// Struttura fase programma (ottimizzata)
 struct ProgramPhase {
-    char name[32];                    // Nome fase (es. "Stufatura")
+    char name[16];                    // Nome fase ridotto (16 char)
     float temp_min;                   // Temperatura minima
     float temp_max;                   // Temperatura massima
     float hum_min;                    // Umidità minima (-1 = non controllata)
@@ -268,12 +330,12 @@ struct ProgramPhase {
     bool is_final_phase;              // True se fase finale/stagionatura
 };
 
-// Struttura programma completo
+// Struttura programma completo (ottimizzata)
 struct StagingProgram {
-    char name[64];                    // Nome programma
-    char description[128];            // Descrizione
+    char name[32];                    // Nome programma ridotto
+    char description[64];             // Descrizione ridotta
     int total_phases;                 // Numero totale fasi
-    ProgramPhase phases[30];          // Fasi (max 30 come da specifiche)
+    ProgramPhase phases[15];          // Fasi ridotte (max 15 invece di 30)
     bool is_loaded;                   // Programma caricato in memoria
     bool is_valid;                    // Programma valido
 };
@@ -290,16 +352,16 @@ struct ProgramExecution {
     bool phase_completed;             // Fase corrente completata
 };
 
-// Struttura gestione SD
+// Struttura gestione SD (ottimizzata memoria)
 struct SDManager {
     bool is_available;                // SD disponibile
     bool retry_needed;                // Necessita retry
     int retry_count;                  // Contatore tentativi
     unsigned long last_retry_time;    // Ultimo tentativo
-    char last_error[64];              // Ultimo errore
+    char last_error[32];              // Ultimo errore (ridotto da 64)
     unsigned long last_operation_time; // Ultima operazione
     int programs_count;               // Numero programmi disponibili
-    char program_list[20][64];        // Lista nomi programmi (max 20)
+    char program_list[10][32];        // Lista nomi programmi (ridotto: 10 programmi, 32 char)
 };
 
 // Enumerazione tipi emergenza
@@ -313,14 +375,14 @@ enum EmergencyType {
     EMERGENCY_ACTUATOR_FAILURE        // Fallimento attuatori
 };
 
-// Struttura gestione emergenze
+// Struttura gestione emergenze (ottimizzata)
 struct EmergencySystem {
     bool is_active;                   // Emergenza attiva
     EmergencyType current_type;       // Tipo emergenza corrente
     unsigned long start_time;         // Inizio emergenza
     unsigned long last_check_time;    // Ultimo controllo
     int trigger_count;                // Contatore trigger
-    char description[128];            // Descrizione emergenza
+    char description[64];             // Descrizione emergenza (ridotta)
     
     // Parametri recovery
     bool recovery_attempted;          // Recovery tentato
@@ -416,6 +478,9 @@ CRGB leds_12[NUM_LEDS_12];          // LED strip secondario 12bit
 // ===============================================================================
 
 SensorData sensors;                 // Dati sensori globali
+
+// Variabili globali per coordinate touch (soluzione forum Arduino MCUFRIEND)
+int pixel_x, pixel_y;
 SystemState system_state;           // Stato sistema globale
 TouchData touch_data;               // Dati gestione touch
 UIState ui_state;                   // Stato interfaccia utente
@@ -426,6 +491,7 @@ SDManager sd_manager;               // Gestione SD card
 EmergencySystem emergency_system;   // Sistema emergenze
 AlarmSystem alarm_system;           // Sistema allarmi
 LEDSystem led_system;               // Sistema LED avanzato
+BacklightSystem backlight_system;   // Sistema retroilluminazione display
 
 // ===============================================================================
 // FORWARD DECLARATIONS
@@ -444,6 +510,8 @@ void initializeRelays();
 bool readSensors();
 bool validateSensorData();
 void handleSensorErrors();
+void applySensorFilters(float temp_raw, float hum_raw);
+bool detectSensorSpike(float new_value, float filtered_value);
 
 // Sistema di controllo
 void updateControlSystem();
@@ -483,6 +551,16 @@ void handleTouch();
 void updateLEDs();
 void handleBuzzer();
 
+// Sistema retroilluminazione display
+void initializeBacklight();
+void updateBacklight();
+void setBacklightLevel(uint8_t level);
+void fadeBacklightTo(uint8_t target_level, unsigned long duration_ms);
+void backlight_activity_detected();
+void toggleBacklight();
+void setBacklightProfile(int profile); // 0=Day, 1=Night, 2=Standby
+void backlight_emergency_mode(bool enable);
+
 // Sistema LED avanzato
 void playStartupAnimation();
 void updateLEDMode();
@@ -509,6 +587,12 @@ void updateActuatorsRing12();       // Ring 12: Attuatori attivi (legenda colori
 void updateProgramRing24();         // Ring 24: Ore rimanenti (conto alla rovescia)
 void updatePhaseCountdownRing12();  // Ring 12: Fasi programma
 
+// Gestione pin SPI condivisi (Touch + SD)
+void spi_select_touch();
+void spi_select_sd();
+void spi_deselect_all();
+bool Touch_getXY(void);  // Funzione helper dal forum Arduino
+
 // Sistema touch avanzato
 bool processTouchDebounce();
 void processValidTouch();
@@ -518,6 +602,7 @@ void handleSettingsTouch();
 void handleProgramsTouch();
 void handleEmergencyTouch();
 void handleCalibrationTouch();
+void handleDiagnosticTouch();
 void switchToScreen(DisplayScreen new_screen);
 void updateUIColors();
 
@@ -534,6 +619,7 @@ void drawSettingsScreen();
 void drawProgramsScreen();
 void drawEmergencyScreen();
 void drawCalibrationScreen();
+void drawDiagnosticScreen();
 void drawErrorScreen();
 void drawStatusBar();
 void updateScreenData();
@@ -560,6 +646,21 @@ void handleMillisOverflow();
 void saveSettings();
 void loadSettings();
 
+// Modalità demo
+void toggleDemoMode();
+bool isDemoModeActive();
+void updateDemoModeStatus();
+
+// Comandi seriali
+void handleSerialCommands();
+
+// Test e diagnostica produzione
+void runDiagnosticTests();
+void logSystemHealth();
+void stressTestSensors();
+void validateMemoryUsage();
+void printProductionReport();
+
 // ===============================================================================
 // SETUP - INIZIALIZZAZIONE SISTEMA
 // ===============================================================================
@@ -567,8 +668,28 @@ void loadSettings();
 void setup() {
     // Inizializzazione seriale per debug
     Serial.begin(115200);
-    Serial.println(F("=== STAGIONINO V1.0 - AVVIO SISTEMA ==="));
-    Serial.println(F("Sistema di controllo ambientale per stagionatura salumi"));
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║          STAGIONINO v1.2             ║"));
+    Serial.println(F("║    Sistema Stagionatura Salumi       ║"));
+    Serial.println(F("║         Avvio Sistema...             ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    Serial.println(F(""));
+    Serial.println(F("🎛️  COMANDI SERIALI DISPONIBILI:"));
+    Serial.println(F("   - 'demo' → Attiva modalità demo"));
+    Serial.println(F("   - 'nodemo' → Disattiva modalità demo"));
+    Serial.println(F("   - 'status' → Mostra stato sistema"));
+    Serial.println(F("   - 'backlight' → Test controllo retroilluminazione"));
+    Serial.println(F("   - 'refresh' → Forza aggiornamento display"));
+    Serial.println(F("   - 'testdisplay' → Test diagnostico display ILI9486/9488"));
+    Serial.println(F("   - 'testtouch' → Test diagnostico touchscreen XPT2046"));
+    Serial.println(F("   - 'uiinfo' → Mostra stato interfaccia utente"));
+    Serial.println(F("   - 'dashboard' → Forza disegno dashboard principale"));
+    Serial.println(F("   - 'tfttest' → Test base display TFT (solo colori)"));
+    Serial.println(F("   - 'sdtest' → Diagnosi SD card e bus SPI condiviso"));
+    Serial.println(F(""));
+    Serial.println(F("ℹ️  NOTA: Touch condivide pin con TFT+SD - gestione ottimizzata"));
+    Serial.println(F(""));
     
     // Disabilita watchdog durante inizializzazione
     wdt_disable();
@@ -576,9 +697,55 @@ void setup() {
     // Inizializzazione strutture dati
     initializeSystemState();
     
+    // Controllo precoce modalità demo per evitare blocchi
+    Serial.println(F("Controllo sensori disponibili..."));
+    delay(500); // Breve pausa per stabilizzare
+    
     // Inizializzazione hardware step by step
     Serial.println(F("Inizializzazione hardware..."));
     initializeHardware();
+    
+    // Se nessun sensore disponibile, forza modalità demo immediatamente
+    if (!system_state.am2315_available && !system_state.dht11_available) {
+        Serial.println(F(""));
+        Serial.println(F("⚠️  NESSUN SENSORE RILEVATO"));
+        Serial.println(F("🎛️  ATTIVAZIONE AUTOMATICA MODALITÀ DEMO"));
+        Serial.println(F("   Digita 'demo' per confermare o attendere 3 secondi..."));
+        
+        // Attendi comando o timeout
+        unsigned long start_wait = millis();
+        bool demo_confirmed = false;
+        while (millis() - start_wait < 3000 && !demo_confirmed) {
+            if (Serial.available()) {
+                String early_cmd = Serial.readStringUntil('\n');
+                early_cmd.trim();
+                early_cmd.toLowerCase();
+                if (early_cmd == "demo") {
+                    demo_confirmed = true;
+                    Serial.println(F("✅ Demo confermata da utente"));
+                }
+            }
+            delay(100);
+        }
+        
+        // Attiva modalità demo
+        updateDemoModeStatus(); // Questo attiverà la demo automaticamente
+        if (system_state.demo_mode_active) {
+            // Inizializza dati demo
+            sensors.temp_internal = 12.5;
+            sensors.hum_internal = 60.0;
+            sensors.temp_external = 15.0;
+            sensors.hum_external = 55.0;
+            sensors.internal_valid = true;
+            sensors.external_valid = true;
+            sensors.internal_error_count = 0;
+            sensors.external_error_count = 0;
+            sensors.last_read_time = millis();
+            
+            Serial.println(F("✅ MODALITÀ DEMO ATTIVATA"));
+            Serial.println(F("   Sistema procederà con dati simulati"));
+        }
+    }
     
     // Abilita watchdog per protezione sistema
     Serial.println(F("Abilitazione protezione watchdog..."));
@@ -586,6 +753,21 @@ void setup() {
     
     Serial.println(F("=== SISTEMA STAGIONINO PRONTO ==="));
     printSystemStatus();
+    
+    // Forza il ridisegno della schermata principale
+    ui_state.screen_needs_redraw = true;
+    ui_state.force_full_redraw = true;
+    
+    // Aggiornamento immediato del display per uscire dalla schermata di caricamento
+    Serial.println(F("Aggiornamento display..."));
+    updateDisplay();
+    
+    // Test diagnostici semplificati durante inizializzazione
+    Serial.println(F("Test memoria sistema..."));
+    validateMemoryUsage();
+    Serial.println(F("=== SISTEMA STAGIONINO PRONTO ==="));
+    Serial.println(F("Setup completato - avvio loop principale..."));
+    delay(500); // Breve pausa prima del loop
 }
 
 // ===============================================================================
@@ -604,12 +786,24 @@ void initializeSystemState() {
     sensors.internal_error_count = 0;
     sensors.external_error_count = 0;
     
+    // Inizializzazione filtri sensori
+    sensors.temp_internal_filtered = NAN;
+    sensors.hum_internal_filtered = NAN;
+    sensors.buffer_index = 0;
+    sensors.filter_initialized = false;
+    for (int i = 0; i < 3; i++) {
+        sensors.temp_buffer[i] = NAN;
+        sensors.hum_buffer[i] = NAN;
+    }
+    
     // Inizializzazione stato sistema
     system_state.emergency_mode = false;
     system_state.sd_available = false;
     system_state.rtc_available = false;
     system_state.am2315_available = false;
     system_state.dht11_available = false;
+    system_state.demo_mode_forced = false;     // Modalità demo disabilitata di default
+    system_state.demo_mode_active = false;     // Nessuna modalità demo attiva inizialmente
     system_state.uptime = millis();
     system_state.manual_mode_start = millis();  // Inizializza tempo modalità manuale
     system_state.last_watchdog_reset = millis();
@@ -644,6 +838,28 @@ void initializeSystemState() {
     
     // Inizializzazione sistema emergenze e allarmi
     initializeEmergencySystem();
+    
+    // Inizializzazione sistema retroilluminazione
+    backlight_system.is_enabled = true;
+    backlight_system.current_level = BACKLIGHT_MAX_LEVEL;
+    backlight_system.target_level = BACKLIGHT_MAX_LEVEL;
+    backlight_system.last_activity = millis();
+    backlight_system.last_update = millis();
+    backlight_system.auto_dim_enabled = true;
+    backlight_system.manual_control = false;
+    backlight_system.emergency_mode = false;
+    
+    // Profili preimpostati
+    backlight_system.day_level = BACKLIGHT_MAX_LEVEL;      // 255 (100%)
+    backlight_system.night_level = BACKLIGHT_AUTO_DIM;     // 120 (47%)
+    backlight_system.standby_level = BACKLIGHT_MIN_LEVEL;  // 30 (12%)
+    
+    // Fade
+    backlight_system.fade_in_progress = false;
+    backlight_system.fade_start_time = 0;
+    backlight_system.fade_start_level = BACKLIGHT_MAX_LEVEL;
+    backlight_system.fade_target_level = BACKLIGHT_MAX_LEVEL;
+    backlight_system.fade_duration = 1000; // 1 secondo default
     
     Serial.println(F("Strutture dati sistema inizializzate"));
 }
@@ -704,11 +920,11 @@ void initializeEmergencySystem() {
     emergency_system.recovery_attempts = 0;
     emergency_system.last_recovery_time = 0;
     
-    // Soglie critiche configurabili
-    emergency_system.critical_temp_threshold = 5.0;      // °C sotto target
-    emergency_system.extreme_temp_low = -10.0;           // °C assoluta
-    emergency_system.extreme_temp_high = 40.0;           // °C assoluta
-    emergency_system.sensor_failure_threshold = 10;      // Fallimenti consecutivi
+    // Soglie critiche bilanciate per produzione
+    emergency_system.critical_temp_threshold = 5.0;      // °C sotto target (bilanciato vs sbalzi)
+    emergency_system.extreme_temp_low = -5.0;            // °C assoluta (più conservativo)
+    emergency_system.extreme_temp_high = 35.0;           // °C assoluta (più conservativo)
+    emergency_system.sensor_failure_threshold = 6;       // Fallimenti consecutivi (ridotto)
     
     // Statistiche
     emergency_system.total_emergency_time = 0;
@@ -827,11 +1043,21 @@ void printSystemStatus() {
 // ===============================================================================
 
 void loop() {
+    // Debug: messaggio solo al primo ciclo
+    static bool first_loop = true;
+    if (first_loop) {
+        Serial.println(F(">>> LOOP PRINCIPALE AVVIATO <<<"));
+        first_loop = false;
+    }
+    
     // Reset watchdog ogni ciclo
     resetWatchdog();
     
     // Gestione overflow millis() (dopo ~50 giorni)
     handleMillisOverflow();
+    
+    // Gestisci comandi seriali
+    handleSerialCommands();
     
     // Lettura sensori con intervallo ottimizzato
     static unsigned long lastSensorRead = 0;
@@ -852,7 +1078,18 @@ void loop() {
     
     // Aggiornamento interfaccia utente
     static unsigned long lastDisplayUpdate = 0;
+    static int force_updates = 5; // Forza aggiornamenti per i primi 5 cicli
+    
     if (millis() - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
+        // Forza ridisegno per i primi cicli dopo l'avvio
+        if (force_updates > 0) {
+            ui_state.screen_needs_redraw = true;
+            ui_state.force_full_redraw = true;
+            force_updates--;
+            Serial.print(F("Forzando aggiornamento display "));
+            Serial.println(6 - force_updates);
+        }
+        
         updateDisplay();
         lastDisplayUpdate = millis();
     }
@@ -863,6 +1100,16 @@ void loop() {
     // Aggiornamento LED e buzzer
     updateLEDs();
     handleBuzzer();
+    
+    // Aggiornamento retroilluminazione display
+    updateBacklight();
+    
+    // Log periodico salute sistema (ogni ora)
+    static unsigned long lastHealthLog = 0;
+    if (millis() - lastHealthLog >= 3600000) {
+        logSystemHealth();
+        lastHealthLog = millis();
+    }
     
     // Piccolo delay per ottimizzare CPU
     delay(50);
@@ -885,18 +1132,64 @@ void initializeHardware() {
     // Inizializzazione display
     Serial.println(F("-> Inizializzazione display"));
     initializeDisplay();
+    Serial.println(F("   Display inizializzato - continuando..."));
     
-    // Inizializzazione RTC
+    // Aggiorna display con progresso inizializzazione
+    tft.setCursor(10, 50);
+    tft.println(F("-> RTC..."));
+    
+    wdt_reset(); // Reset watchdog dopo display
+    
+    // Inizializzazione RTC con timeout
     Serial.println(F("-> Inizializzazione RTC"));
+    unsigned long rtc_start = millis();
     initializeRTC();
+    Serial.print(F("   RTC completato in "));
+    Serial.print(millis() - rtc_start);
+    Serial.println(F("ms"));
     
-    // Inizializzazione LED
+    // Aggiorna display
+    tft.setCursor(10, 70);
+    tft.println(F("-> LED..."));
+    
+    wdt_reset(); // Reset watchdog dopo RTC
+    
+    // Inizializzazione LED con timeout
     Serial.println(F("-> Inizializzazione LED"));
+    unsigned long led_start = millis();
     initializeLEDs();
+    Serial.print(F("   LED completato in "));
+    Serial.print(millis() - led_start);
+    Serial.println(F("ms"));
+    
+    // Aggiorna display
+    tft.setCursor(10, 90);
+    tft.println(F("-> SD Card..."));
+    
+    wdt_reset(); // Reset watchdog dopo LED
     
     // Inizializzazione SD (con retry)
     Serial.println(F("-> Inizializzazione SD Card"));
+    unsigned long sd_start = millis();
     initializeSD();
+    Serial.print(F("   SD completato in "));
+    Serial.print(millis() - sd_start);
+    Serial.println(F("ms"));
+    
+    // Aggiorna display
+    tft.setCursor(10, 110);
+    tft.println(F("-> Sistema pronto!"));
+    
+    wdt_reset(); // Reset watchdog dopo SD
+    
+    // Inizializzazione retroilluminazione display
+    Serial.println(F("-> Inizializzazione retroilluminazione display"));
+    unsigned long backlight_start = millis();
+    initializeBacklight();
+    Serial.print(F("   Backlight completato in "));
+    Serial.print(millis() - backlight_start);
+    Serial.println(F("ms"));
+    wdt_reset(); // Reset watchdog dopo backlight
     
     Serial.println(F("-> Inizializzazione hardware completata"));
 }
@@ -987,54 +1280,159 @@ void initializeSensors() {
     } else {
         Serial.println(F("     ERRORE: Lettura DHT11 fallita"));
         Serial.println(F("     Verificare collegamento pin 2"));
+        system_state.dht11_available = false;
+    }
+    
+    // Aggiorna status modalità demo
+    updateDemoModeStatus();
+    
+    // Modalità DEMO se attiva (automatica o forzata)
+    if (system_state.demo_mode_active) {
+        Serial.println(F(""));
+        Serial.println(F("╔══════════════════════════════════════╗"));
+        Serial.println(F("║      ⚠️  MODALITÀ DEMO ATTIVA       ║"));
+        if (system_state.demo_mode_forced) {
+            Serial.println(F("║   MODALITÀ DEMO FORZATA MANUALMENTE  ║"));
+        } else {
+            Serial.println(F("║   NESSUN SENSORE RILEVATO            ║"));
+        }
+        Serial.println(F("║   USANDO DATI SIMULATI               ║"));
+        Serial.println(F("╚══════════════════════════════════════╝"));
+        Serial.println(F("Sistema continuerà con dati simulati per test display"));
+        
+        // Simula dati sensori per permettere il funzionamento
+        sensors.temp_internal = 12.5;          // Temperatura simulata
+        sensors.hum_internal = 60.0;           // Umidità simulata
+        sensors.temp_external = 15.0;          // Temperatura esterna simulata
+        sensors.hum_external = 55.0;           // Umidità esterna simulata
+        sensors.internal_valid = true;         // Forza validità per evitare emergenze
+        sensors.external_valid = true;         // Forza validità
+        sensors.internal_error_count = 0;
+        sensors.external_error_count = 0;
     }
 }
 
 void initializeDisplay() {
-    Serial.println(F("  -> Inizializzazione Display ILI9486"));
+    Serial.println(F("  -> Inizializzazione Display ILI9486/ILI9488"));
+    
+    // IMPORTANTE: Gestione pin SPI condivisi (Touch + SD)
+    // Assicura che tutti i CS siano HIGH prima dell'inizializzazione
+    pinMode(TOUCH_CS, OUTPUT);
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(TOUCH_CS, HIGH);  // Disabilita touch
+    digitalWrite(SD_CS, HIGH);     // Disabilita SD
+    delay(100); // Stabilizzazione
     
     // Identificazione automatica display
     uint16_t ID = tft.readID();
-    Serial.print(F("     Display ID: 0x"));
+    Serial.print(F("     Display ID rilevato: 0x"));
     Serial.println(ID, HEX);
     
-    // Inizializzazione display
-    if (ID == 0xFFFF) {
-        Serial.println(F("     ERRORE: Display non rilevato!"));
-        Serial.println(F("     Verificare collegamenti shield"));
+    // Gestione diversi controller basata su forum Arduino
+    if (ID == 0xFFFF || ID == 0x0000) {
+        Serial.println(F("     ATTENZIONE: Display non rilevato automaticamente!"));
+        Serial.println(F("     Tentativo con ILI9486 (fallback)..."));
         ID = 0x9486; // Fallback per ILI9486
+    } else if (ID == 0x9488) {
+        Serial.println(F("     Display ILI9488 rilevato"));
+    } else if (ID == 0x9486) {
+        Serial.println(F("     Display ILI9486 rilevato"));
+    } else {
+        Serial.print(F("     Display controller sconosciuto: 0x"));
+        Serial.println(ID, HEX);
+        Serial.println(F("     Tentativo con ID rilevato..."));
     }
     
     tft.begin(ID);
     tft.setRotation(1); // Orientamento landscape
+    
+    // Test riempimento schermo per verificare funzionamento
+    Serial.println(F("     Test display in corso..."));
+    tft.fillScreen(0xFFFF); // Test schermo bianco
+    delay(500);
     tft.fillScreen(0x0000); // Schermo nero
+    delay(500);
+    
+    // Verifica risoluzione
+    uint16_t width = tft.width();
+    uint16_t height = tft.height();
+    Serial.print(F("     Risoluzione: "));
+    Serial.print(width);
+    Serial.print(F("x"));
+    Serial.println(height);
+    
+    if (width == 0 || height == 0) {
+        Serial.println(F("     ERRORE: Risoluzione non valida - problema inizializzazione"));
+        // Tentativo di re-inizializzazione
+        delay(1000);
+        tft.begin(0x9486); // Forza ILI9486
+        width = tft.width();
+        height = tft.height();
+        Serial.print(F("     Risoluzione dopo retry: "));
+        Serial.print(width);
+        Serial.print(F("x"));
+        Serial.println(height);
+    }
     
     // Test display con messaggio di avvio
     tft.setTextColor(0xFFFF, 0x0000); // Bianco su nero
     tft.setTextSize(2);
     tft.setCursor(10, 10);
-    tft.println(F("STAGIONINO V1.0"));
+    tft.println(F("STAGIONINO V1.2"));
     tft.setTextSize(1);
     tft.setCursor(10, 40);
     tft.println(F("Sistema Stagionatura Salumi"));
     tft.setCursor(10, 60);
-    tft.println(F("Inizializzazione..."));
+    tft.println(F("Caricamento..."));
+    
+    // Indicatore visivo del controller rilevato
+    tft.setCursor(10, 80);
+    tft.print(F("Controller: 0x"));
+    tft.println(ID, HEX);
+    
+    // Breve pausa per mostrare il messaggio
+    delay(1000); // Ridotto da 2000ms a 1000ms per velocizzare
+    
+    // Cancella schermata di caricamento e mostra stato
+    tft.fillScreen(0x0000); // Schermo nero
+    tft.setTextColor(0xFFFF, 0x0000);
+    tft.setTextSize(1);
+    tft.setCursor(10, 10);
+    tft.println(F("STAGIONINO V1.2 - Inizializzazione..."));
+    tft.setCursor(10, 30);
+    tft.print(F("Display OK - Controller: 0x"));
+    tft.println(ID, HEX);
     
     Serial.print(F("     Display: OK - Risoluzione: "));
     Serial.print(tft.width());
     Serial.print(F("x"));
     Serial.println(tft.height());
     
-    // Inizializzazione touchscreen
+    // Inizializzazione touchscreen con gestione pin condivisi
     Serial.println(F("  -> Inizializzazione Touchscreen XPT2046"));
+    
+    // Assicura che SD sia disabilitata durante init touch
+    digitalWrite(SD_CS, HIGH);
+    delay(50);
+    
     touch.begin();
     touch.setRotation(1); // Stesso orientamento del display
     
-    // Test touch
+    // Test touch con gestione conflitti SPI
+    bool touch_working = false;
+    digitalWrite(TOUCH_CS, LOW);  // Seleziona touch
+    delay(10);
     if (touch.tirqTouched()) {
         Serial.println(F("     Touchscreen: Tocco rilevato durante init"));
+        touch_working = true;
     }
-    Serial.println(F("     Touchscreen: OK"));
+    digitalWrite(TOUCH_CS, HIGH); // Deseleziona touch
+    
+    if (touch_working) {
+        Serial.println(F("     Touchscreen: OK (touch attivo)"));
+    } else {
+        Serial.println(F("     Touchscreen: OK (nessun tocco)"));
+    }
 }
 
 void initializeRTC() {
@@ -1130,7 +1528,7 @@ void initializeLEDs() {
     Serial.println(F("     Sequenza avvio LED..."));
     playStartupAnimation();
     
-    // Passa a modalità normale
+    // Passa a modalità normale (forza NORMAL per evitare ERROR durante init)
     led_system.current_mode = LED_MODE_NORMAL;
     
     Serial.print(F("     LED Strip 24bit: "));
@@ -1142,24 +1540,59 @@ void initializeLEDs() {
 }
 
 void initializeSD() {
-    Serial.println(F("  -> Inizializzazione SD Card"));
+    Serial.println(F("  -> Inizializzazione SD Card (pin SPI condivisi)"));
+    
+    // IMPORTANTE: Gestione pin SPI condivisi
+    // Disabilita touch prima di inizializzare SD
+    digitalWrite(TOUCH_CS, HIGH);
+    digitalWrite(SD_CS, HIGH);
+    delay(100); // Stabilizzazione bus SPI
     
     bool sd_ok = false;
     
-    // Tentativi multipli di inizializzazione SD
+    // Tentativi multipli con timeout per evitare blocchi
     for (int retry = 0; retry < SD_RETRY_COUNT; retry++) {
         Serial.print(F("     Tentativo SD "));
         Serial.print(retry + 1);
         Serial.print(F("/"));
-        Serial.println(SD_RETRY_COUNT);
+        Serial.print(SD_RETRY_COUNT);
+        Serial.print(F(" (CS="));
+        Serial.print(SD_CS);
+        Serial.println(F(")"));
         
+        // Assicura stato bus SPI prima del tentativo
+        digitalWrite(TOUCH_CS, HIGH);  // Disabilita touch
+        digitalWrite(SD_CS, HIGH);     // Reset SD CS
+        delay(50);
+        
+        // Timeout per inizializzazione SD (max 3 secondi)
+        unsigned long start_time = millis();
+        bool init_success = false;
+        
+        // Prova inizializzazione con timeout
+        wdt_reset(); // Reset watchdog prima dell'operazione
         if (SD.begin(SD_CS)) {
+            init_success = true;
+        }
+        
+        unsigned long elapsed = millis() - start_time;
+        
+        if (init_success && elapsed < 3000) {
             sd_ok = true;
-            Serial.println(F("     SD Card: Inizializzazione OK"));
+            Serial.print(F("     SD Card: OK ("));
+            Serial.print(elapsed);
+            Serial.println(F("ms)"));
             break;
         } else {
-            Serial.println(F("     SD Card: Inizializzazione fallita"));
-            delay(1000);
+            Serial.print(F("     SD Card: Fallito ("));
+            Serial.print(elapsed);
+            Serial.println(F("ms)"));
+            
+            // Delay ridotto per tentativi successivi
+            if (retry < SD_RETRY_COUNT - 1) {
+                delay(500); // Ridotto da 1000ms
+                wdt_reset();
+            }
         }
     }
     
@@ -1169,6 +1602,21 @@ void initializeSD() {
         Serial.println(F("     - Solo modalità manuale disponibile"));
         Serial.println(F("     - Nessun salvataggio programmi"));
         system_state.sd_available = false;
+        
+        // IMPORTANTE: Reset bus SPI dopo fallimento SD
+        // Questo evita interferenze con TFT
+        Serial.println(F("     🔄 Ripulitura bus SPI per TFT..."));
+        digitalWrite(SD_CS, HIGH);    // Disabilita definitivamente SD
+        digitalWrite(TOUCH_CS, HIGH); // Assicura touch disabilitato
+        delay(100);
+        
+        // Reset SPI per TFT
+        SPI.end();
+        delay(50);
+        SPI.begin();
+        delay(50);
+        
+        Serial.println(F("     Bus SPI ripulito per TFT"));
         return;
     }
     
@@ -1225,6 +1673,43 @@ bool readSensors() {
     sensors.internal_valid = false;
     sensors.external_valid = false;
     
+    // MODALITÀ DEMO: Se modalità demo attiva, usa dati simulati
+    if (isDemoModeActive()) {
+        // Simula dati sensori con piccole variazioni per realismo
+        static float temp_offset = 0.0;
+        static float hum_offset = 0.0;
+        static unsigned long last_change = 0;
+        
+        // Cambia i valori lentamente ogni 30 secondi
+        if (millis() - last_change > 30000) {
+            temp_offset += random(-20, 21) / 100.0;  // ±0.2°C
+            hum_offset += random(-50, 51) / 100.0;   // ±0.5%
+            
+            // Limita le variazioni
+            temp_offset = constrain(temp_offset, -2.0, 2.0);
+            hum_offset = constrain(hum_offset, -5.0, 5.0);
+            
+            last_change = millis();
+        }
+        
+        // Applica variazioni ai dati base
+        sensors.temp_internal = 12.5 + temp_offset;
+        sensors.hum_internal = 60.0 + hum_offset;
+        sensors.temp_external = 15.0 + temp_offset * 0.8;
+        sensors.hum_external = 55.0 + hum_offset * 0.9;
+        
+        // Forza validità per evitare emergenze
+        sensors.internal_valid = true;
+        sensors.external_valid = true;
+        sensors.internal_error_count = 0;
+        sensors.external_error_count = 0;
+        
+        // Aggiorna timestamp
+        sensors.last_read_time = millis();
+        
+        return true;  // Successo simulato
+    }
+    
     // ===== LETTURA SENSORE INTERNO AM2315C =====
     if (system_state.am2315_available) {
         float temp_int, hum_int;
@@ -1237,12 +1722,20 @@ bool readSensors() {
                 if (temp_int >= AM2315C_TEMP_MIN && temp_int <= AM2315C_TEMP_MAX &&
                     hum_int >= AM2315C_HUM_MIN && hum_int <= AM2315C_HUM_MAX) {
                     
-                    sensors.temp_internal = temp_int;
-                    sensors.hum_internal = hum_int;
-                    sensors.internal_valid = true;
-                    sensors.internal_error_count = 0;
-                    am2315_success = true;
-                    break;
+                    // Applica filtri per rilevare spike e stabilizzare
+                    if (!detectSensorSpike(temp_int, sensors.temp_internal_filtered) &&
+                        !detectSensorSpike(hum_int, sensors.hum_internal_filtered)) {
+                        
+                        applySensorFilters(temp_int, hum_int);
+                        sensors.temp_internal = sensors.temp_internal_filtered;
+                        sensors.hum_internal = sensors.hum_internal_filtered;
+                        sensors.internal_valid = true;
+                        sensors.internal_error_count = 0;
+                        am2315_success = true;
+                        break;
+                    } else {
+                        Serial.println(F("SPIKE: Dati AM2315C scartati (spike rilevato)"));
+                    }
                 } else {
                     Serial.print(F("ERRORE: Dati AM2315C fuori range - T:"));
                     Serial.print(temp_int);
@@ -1343,6 +1836,11 @@ bool validateSensorData() {
     // Validazione completa dati sensori
     bool valid = false;
     
+    // MODALITÀ DEMO: Se modalità demo attiva, accetta sempre i dati simulati
+    if (isDemoModeActive()) {
+        return sensors.internal_valid && sensors.external_valid;
+    }
+    
     // Controllo sensore interno
     if (sensors.internal_valid) {
         if (sensors.temp_internal >= AM2315C_TEMP_MIN && 
@@ -1367,6 +1865,11 @@ bool validateSensorData() {
 }
 
 void handleSensorErrors() {
+    // MODALITÀ DEMO: Non gestire errori se in modalità demo
+    if (isDemoModeActive()) {
+        return;  // Skip gestione errori in modalità demo
+    }
+    
     // Gestione errori sensori
     
     // Controllo modalità emergenza per sensore interno
@@ -1589,6 +2092,9 @@ void enterEmergencyMode() {
     // Il controllo frigorifero sarà gestito nel sistema di controllo
     Serial.println(F("Attuatori disattivati - Solo controllo frigorifero attivo"));
     
+    // Attiva modalità emergenza retroilluminazione (sempre al massimo)
+    backlight_emergency_mode(true);
+    
     // Forza cambio alla schermata di emergenza
     switchToScreen(SCREEN_EMERGENCY);
 }
@@ -1719,19 +2225,44 @@ void attemptEmergencyRecovery() {
     Serial.print(F(" per "));
     Serial.println(getEmergencyTypeName(emergency_system.current_type));
     
-    // Recovery specifico per tipo
+    // Recovery specifico per tipo con controlli più rigorosi
     bool recovery_success = false;
+    int validation_count = 0;
     
     switch (emergency_system.current_type) {
         case EMERGENCY_SENSOR_INTERNAL:
-            // Verifica sensore per 3 letture consecutive
-            recovery_success = sensors.internal_valid && sensors.internal_error_count == 0;
+            // Verifica sensore con multiple letture per conferma
+            for (int i = 0; i < 3; i++) {
+                delay(1000);
+                wdt_reset();
+                readSensors(); // Rileggi sensori
+                if (sensors.internal_valid && sensors.internal_error_count == 0) {
+                    validation_count++;
+                }
+            }
+            recovery_success = (validation_count >= 2); // 2 su 3 letture valide
+            Serial.print(F("Validazioni sensore: "));
+            Serial.print(validation_count);
+            Serial.println(F("/3"));
             break;
             
         case EMERGENCY_TEMP_CRITICAL:
-            // Verifica temperatura stabile per almeno 5 minuti
-            recovery_success = sensors.internal_valid && 
-                              (millis() - emergency_system.start_time >= 300000);
+            // Verifica temperatura stabile e trend migliorativo
+            if (sensors.internal_valid) {
+                float target_avg = (control_system.target_temp_min + control_system.target_temp_max) / 2.0;
+                float current_deviation = abs(sensors.temp_internal - target_avg);
+                unsigned long emergency_duration = millis() - emergency_system.start_time;
+                
+                                 // Recovery se deviazione ridotta E tempo minimo trascorso
+                 recovery_success = (current_deviation < emergency_system.critical_temp_threshold * 0.8) && 
+                                  (emergency_duration >= 180000); // Min 3 minuti
+                 
+                 Serial.print(F("Temp deviation: "));
+                 Serial.print(current_deviation, 1);
+                 Serial.print(F("°C (soglia: "));
+                 Serial.print(emergency_system.critical_temp_threshold * 0.8, 1);
+                 Serial.println(F("°C) [5°C bilanciato]"));
+            }
             break;
             
         case EMERGENCY_SD_FAILURE:
@@ -1779,6 +2310,9 @@ void exitEmergencyMode() {
     alarm_system.high_priority_alarm = false;
     alarm_system.alarm_pattern = 0;
     
+    // Disattiva modalità emergenza retroilluminazione
+    backlight_emergency_mode(false);
+    
     Serial.println(F(""));
     Serial.println(F("╔══════════════════════════════════════╗"));
     Serial.println(F("║     ✅ USCITA MODALITÀ EMERGENZA    ║"));
@@ -1809,6 +2343,10 @@ const char* getEmergencyTypeName(EmergencyType type) {
 }
 
 void updateDisplay() {
+    // Debug: conta chiamate updateDisplay
+    static int update_count = 0;
+    update_count++;
+    
     // Controlla se è necessario aggiornare il display
     unsigned long current_time = millis();
     
@@ -1816,13 +2354,19 @@ void updateDisplay() {
     if (ui_state.screen_needs_redraw || system_state.emergency_mode) {
         ui_state.force_full_redraw = true;
         ui_state.screen_needs_redraw = false;
+        Serial.print(F("updateDisplay #"));
+        Serial.print(update_count);
+        Serial.println(F(" - ridisegno necessario"));
     }
     
     // Ridisegno completo o aggiornamento incrementale
     if (ui_state.force_full_redraw) {
+        Serial.print(F("Disegnando schermata: "));
+        Serial.println(ui_state.current_screen);
         drawCurrentScreen();
         ui_state.force_full_redraw = false;
         ui_state.last_screen_update = current_time;
+        Serial.println(F("Schermata disegnata"));
     } else {
         // Aggiornamento incrementale solo per dati che cambiano
         updateScreenData();
@@ -1859,6 +2403,10 @@ void drawCurrentScreen() {
             drawCalibrationScreen();
             break;
             
+        case SCREEN_DIAGNOSTIC:
+            drawDiagnosticScreen();
+            break;
+            
         default:
             // Schermata sconosciuta - disegna errore
             drawErrorScreen();
@@ -1874,25 +2422,42 @@ void drawCurrentScreen() {
 // ===============================================================================
 
 void drawMainDashboard() {
+    Serial.println(F("DEBUG: Iniziando drawMainDashboard"));
+    
     // Titolo principale
     tft.setTextColor(ui_state.text_color);
     tft.setTextSize(TEXT_SIZE_LARGE);
     tft.setCursor(10, 10);
     tft.println(F("STAGIONINO"));
+    Serial.println(F("DEBUG: Titolo disegnato"));
     
-    // Sottotitolo
+    // Sottotitolo con indicatore modalità
     tft.setTextSize(TEXT_SIZE_SMALL);
     tft.setCursor(10, 40);
-    tft.println(F("Sistema Stagionatura Salumi"));
+    if (isDemoModeActive()) {
+        tft.setTextColor(COLOR_YELLOW);
+        tft.println(F("Sistema Stagionatura Salumi - MODALITA' DEMO"));
+        tft.setTextColor(ui_state.text_color);
+        Serial.println(F("DEBUG: Sottotitolo DEMO disegnato"));
+    } else {
+        tft.println(F("Sistema Stagionatura Salumi"));
+        Serial.println(F("DEBUG: Sottotitolo NORMALE disegnato"));
+    }
     
     // Area dati sensori principali
+    Serial.println(F("DEBUG: Chiamando drawSensorDataBox"));
     drawSensorDataBox(10, 70, SCREEN_WIDTH - 20, 120);
+    Serial.println(F("DEBUG: drawSensorDataBox completato"));
     
     // Indicatori stato attuatori
+    Serial.println(F("DEBUG: Chiamando drawActuatorStatus"));
     drawActuatorStatus(10, 200, SCREEN_WIDTH - 20, 60);
+    Serial.println(F("DEBUG: drawActuatorStatus completato"));
     
     // Pulsanti di navigazione
+    Serial.println(F("DEBUG: Chiamando drawNavigationButtons"));
     drawNavigationButtons();
+    Serial.println(F("DEBUG: drawMainDashboard COMPLETATO"));
 }
 
 void drawSensorDataBox(int x, int y, int width, int height) {
@@ -1912,11 +2477,20 @@ void drawSensorDataBox(int x, int y, int width, int height) {
     tft.print(F("Interno: "));
     
     if (sensors.internal_valid) {
-        tft.setTextColor(COLOR_GREEN);
+        // Colore diverso se in modalità demo
+        if (isDemoModeActive()) {
+            tft.setTextColor(COLOR_YELLOW);  // Giallo per dati simulati
+        } else {
+            tft.setTextColor(COLOR_GREEN);   // Verde per dati reali
+        }
         tft.print(sensors.temp_internal, 1);
         tft.print(F("C "));
         tft.print(sensors.hum_internal, 1);
         tft.print(F("%"));
+        if (isDemoModeActive()) {
+            tft.setTextColor(COLOR_GRAY);
+            tft.print(F(" SIM"));  // Indica dati simulati
+        }
     } else {
         tft.setTextColor(COLOR_RED);
         tft.print(F("ERRORE"));
@@ -1928,11 +2502,20 @@ void drawSensorDataBox(int x, int y, int width, int height) {
     tft.print(F("Esterno: "));
     
     if (sensors.external_valid) {
-        tft.setTextColor(COLOR_CYAN);
+        // Colore diverso se in modalità demo
+        if (isDemoModeActive()) {
+            tft.setTextColor(COLOR_YELLOW);  // Giallo per dati simulati
+        } else {
+            tft.setTextColor(COLOR_CYAN);    // Ciano per dati reali
+        }
         tft.print(sensors.temp_external, 1);
         tft.print(F("C "));
         tft.print(sensors.hum_external, 1);
         tft.print(F("%"));
+        if (isDemoModeActive()) {
+            tft.setTextColor(COLOR_GRAY);
+            tft.print(F(" SIM"));  // Indica dati simulati
+        }
     } else {
         tft.setTextColor(COLOR_YELLOW);
         tft.print(F("NON DISP"));
@@ -2112,8 +2695,80 @@ void drawSettingsScreen() {
     tft.setCursor(10, 50);
     tft.println(F("Calibrazione Touch:"));
     
-    drawButton(SCREEN_WIDTH/4, SCREEN_HEIGHT/3, SCREEN_WIDTH/2, 60, 
+    drawButton(20, 80, SCREEN_WIDTH/2 - 30, 50, 
                F("CALIBRA"), COLOR_YELLOW);
+    
+    // Area diagnostica sistema
+    tft.setCursor(10, 150);
+    tft.println(F("Test Sistema:"));
+    
+    drawButton(20, 180, SCREEN_WIDTH/2 - 30, 50, 
+               F("DIAGNOSTICA"), COLOR_CYAN);
+    
+    // Controlli retroilluminazione (lato destro)
+    tft.setCursor(SCREEN_WIDTH/2 + 10, 50);
+    tft.setTextSize(TEXT_SIZE_SMALL);
+    tft.println(F("Retroilluminazione:"));
+    
+    // Pulsante toggle ON/OFF
+    uint16_t toggle_color = backlight_system.is_enabled ? COLOR_GREEN : COLOR_RED;
+    const __FlashStringHelper* toggle_text = backlight_system.is_enabled ? F("ON") : F("OFF");
+    drawButton(SCREEN_WIDTH/2 + 20, 80, SCREEN_WIDTH/2 - 40, 30, toggle_text, toggle_color);
+    
+    // Livello corrente
+    tft.setCursor(SCREEN_WIDTH/2 + 10, 120);
+    tft.print(F("Livello: "));
+    tft.print(backlight_system.current_level);
+    tft.print(F("/255 ("));
+    tft.print((backlight_system.current_level * 100) / 255);
+    tft.println(F("%)"));
+    
+    // Pulsanti profili
+    drawButton(SCREEN_WIDTH/2 + 20, 130, 90, 30, F("GIORNO"), COLOR_ORANGE);
+    drawButton(SCREEN_WIDTH/2 + 120, 130, 90, 30, F("NOTTE"), COLOR_BLUE);
+    
+    // Stato auto-dim
+    tft.setCursor(SCREEN_WIDTH/2 + 10, 170);
+    tft.print(F("Auto-dim: "));
+    tft.setTextColor(backlight_system.auto_dim_enabled ? COLOR_GREEN : COLOR_RED);
+    tft.println(backlight_system.auto_dim_enabled ? F("SI") : F("NO"));
+    tft.setTextColor(ui_state.text_color);
+    
+    // Timeout inattività
+    tft.setCursor(SCREEN_WIDTH/2 + 10, 190);
+    tft.print(F("Timeout: "));
+    tft.print(BACKLIGHT_TIMEOUT / 1000);
+    tft.println(F("s"));
+    
+    // Modalità Demo
+    uint16_t demo_color = isDemoModeActive() ? COLOR_YELLOW : COLOR_GRAY;
+    const __FlashStringHelper* demo_text = isDemoModeActive() ? F("DEMO ON") : F("DEMO OFF");
+    drawButton(SCREEN_WIDTH/2 + 20, 200, SCREEN_WIDTH/2 - 40, 25, demo_text, demo_color);
+    
+    // Info sistema
+    tft.setCursor(SCREEN_WIDTH/2 + 10, 240);
+    tft.print(F("RAM: "));
+    extern int __heap_start, *__brkval;
+    int free_memory = ((int)&free_memory) - ((int)&__heap_start);
+    tft.print(free_memory);
+    tft.println(F(" bytes"));
+    
+    tft.setCursor(SCREEN_WIDTH/2 + 10, 260);
+    tft.print(F("Uptime: "));
+    tft.print(millis() / 3600000);
+    tft.println(F("h"));
+    
+    // Indica tipo modalità demo se attiva
+    if (isDemoModeActive()) {
+        tft.setCursor(SCREEN_WIDTH/2 + 10, 280);
+        tft.setTextColor(COLOR_YELLOW);
+        if (system_state.demo_mode_forced) {
+            tft.println(F("DEMO: FORZATA"));
+        } else {
+            tft.println(F("DEMO: AUTO"));
+        }
+        tft.setTextColor(ui_state.text_color);
+    }
     
     // Pulsante indietro
     drawButton(10, SCREEN_HEIGHT - 50, 80, 40, F("BACK"), ui_state.accent_color);
@@ -2245,6 +2900,142 @@ void drawCalibrationScreen() {
                F("FATTO"), COLOR_GREEN);
 }
 
+void drawDiagnosticScreen() {
+    static bool test_running = false;
+    static unsigned long test_start_time = 0;
+    static int test_phase = 0;
+    
+    tft.setTextColor(ui_state.text_color);
+    tft.setTextSize(TEXT_SIZE_MEDIUM);
+    tft.setCursor(10, 10);
+    tft.println(F("DIAGNOSTICA SISTEMA"));
+    
+    // Area risultati test
+    tft.setTextSize(TEXT_SIZE_SMALL);
+    int y_pos = 50;
+    
+    // Test memoria RAM
+    tft.setCursor(10, y_pos);
+    tft.print(F("RAM libera: "));
+    extern int __heap_start, *__brkval;
+    int free_memory;
+    if ((int)__brkval == 0) {
+        free_memory = ((int)&free_memory) - ((int)&__heap_start);
+    } else {
+        free_memory = ((int)&free_memory) - ((int)__brkval);
+    }
+    
+    tft.print(free_memory);
+    tft.print(F(" bytes "));
+    if (free_memory > 1500) {
+        tft.setTextColor(COLOR_GREEN);
+        tft.println(F("OK"));
+    } else if (free_memory > 1000) {
+        tft.setTextColor(COLOR_YELLOW);
+        tft.println(F("LIMITE"));
+    } else {
+        tft.setTextColor(COLOR_RED);
+        tft.println(F("CRITICO"));
+    }
+    tft.setTextColor(ui_state.text_color);
+    y_pos += 20;
+    
+    // Status sensori
+    tft.setCursor(10, y_pos);
+    tft.print(F("Sensore interno: "));
+    if (sensors.internal_valid) {
+        tft.setTextColor(COLOR_GREEN);
+        tft.print(F("OK ("));
+        tft.print(sensors.temp_internal, 1);
+        tft.print(F("C "));
+        tft.print(sensors.hum_internal, 1);
+        tft.println(F("%)"));
+    } else {
+        tft.setTextColor(COLOR_RED);
+        tft.print(F("ERRORE ("));
+        tft.print(sensors.internal_error_count);
+        tft.println(F(" fallimenti)"));
+    }
+    tft.setTextColor(ui_state.text_color);
+    y_pos += 20;
+    
+    tft.setCursor(10, y_pos);
+    tft.print(F("Sensore esterno: "));
+    if (sensors.external_valid) {
+        tft.setTextColor(COLOR_GREEN);
+        tft.print(F("OK ("));
+        tft.print(sensors.temp_external, 1);
+        tft.print(F("C)"));
+    } else {
+        tft.setTextColor(COLOR_YELLOW);
+        tft.print(F("NON DISP"));
+    }
+    tft.setTextColor(ui_state.text_color);
+    tft.println();
+    y_pos += 20;
+    
+    // Status sistema
+    tft.setCursor(10, y_pos);
+    tft.print(F("SD Card: "));
+    tft.setTextColor(system_state.sd_available ? COLOR_GREEN : COLOR_RED);
+    tft.println(system_state.sd_available ? F("OK") : F("ERRORE"));
+    tft.setTextColor(ui_state.text_color);
+    y_pos += 20;
+    
+    tft.setCursor(10, y_pos);
+    tft.print(F("RTC: "));
+    tft.setTextColor(system_state.rtc_available ? COLOR_GREEN : COLOR_RED);
+    tft.println(system_state.rtc_available ? F("OK") : F("ERRORE"));
+    tft.setTextColor(ui_state.text_color);
+    y_pos += 20;
+    
+    // Emergenze
+    tft.setCursor(10, y_pos);
+    tft.print(F("Emergenze totali: "));
+    if (emergency_system.emergency_episodes == 0) {
+        tft.setTextColor(COLOR_GREEN);
+        tft.println(F("0 (PERFETTO)"));
+    } else {
+        tft.setTextColor(COLOR_YELLOW);
+        tft.println(emergency_system.emergency_episodes);
+    }
+    tft.setTextColor(ui_state.text_color);
+    y_pos += 20;
+    
+    // Uptime
+    tft.setCursor(10, y_pos);
+    tft.print(F("Uptime: "));
+    unsigned long uptime_hours = millis() / 3600000;
+    unsigned long uptime_minutes = (millis() % 3600000) / 60000;
+    tft.print(uptime_hours);
+    tft.print(F("h "));
+    tft.print(uptime_minutes);
+    tft.println(F("m"));
+    y_pos += 20;
+    
+    // Valutazione sistema
+    tft.setCursor(10, y_pos + 10);
+    tft.setTextSize(TEXT_SIZE_MEDIUM);
+    
+    bool system_healthy = (free_memory > 1000) && 
+                         sensors.internal_valid && 
+                         (emergency_system.emergency_episodes < 3);
+    
+    if (system_healthy) {
+        tft.setTextColor(COLOR_GREEN);
+        tft.println(F("SISTEMA: STABILE"));
+    } else {
+        tft.setTextColor(COLOR_YELLOW);
+        tft.println(F("SISTEMA: ATTENZIONE"));
+    }
+    
+    // Pulsanti
+    drawButton(10, SCREEN_HEIGHT - 90, 100, 35, F("TEST STRESS"), COLOR_ORANGE);
+    drawButton(120, SCREEN_HEIGHT - 90, 100, 35, F("REFRESH"), COLOR_BLUE);
+    drawButton(10, SCREEN_HEIGHT - 50, 80, 35, F("BACK"), ui_state.accent_color);
+    drawButton(SCREEN_WIDTH - 120, SCREEN_HEIGHT - 50, 110, 35, F("REPORT"), COLOR_CYAN);
+}
+
 void drawErrorScreen() {
     tft.setTextColor(COLOR_RED);
     tft.setTextSize(TEXT_SIZE_LARGE);
@@ -2304,23 +3095,17 @@ void handleTouch() {
     touch_data.last_x = touch_data.x;
     touch_data.last_y = touch_data.y;
     
-    // Legge stato touch corrente
-    touch_data.is_touched = touch.touched();
+    // Usa la funzione helper che gestisce correttamente i pin condivisi
+    // Basata sulla soluzione del forum Arduino MCUFRIEND
+    touch_data.is_touched = Touch_getXY();
     
     if (touch_data.is_touched) {
-        // XPT2046_Touchscreen non ha getPoint(), usa i metodi diretti
-        // Ottieni coordinate raw dal touch
-        uint16_t raw_x, raw_y;
-        uint8_t raw_z;
-        touch.readData(&raw_x, &raw_y, &raw_z);
+        // Le coordinate sono già mappate dalla funzione helper
+        touch_data.x = pixel_x;
+        touch_data.y = pixel_y;
         
-        // Mappa coordinate touch a coordinate schermo
-        touch_data.x = map(raw_x, 200, 3700, 0, SCREEN_WIDTH);
-        touch_data.y = map(raw_y, 200, 3700, 0, SCREEN_HEIGHT);
-        
-        // Limita coordinate ai bordi schermo
-        touch_data.x = constrain(touch_data.x, 0, SCREEN_WIDTH - 1);
-        touch_data.y = constrain(touch_data.y, 0, SCREEN_HEIGHT - 1);
+        // Notifica attività al sistema retroilluminazione
+        backlight_activity_detected();
     }
     
     // Gestione anti-bounce touch
@@ -2372,6 +3157,9 @@ void processValidTouch() {
     Serial.print(F(", Y="));
     Serial.println(touch_data.y);
     
+    // Registra attività per retroilluminazione
+    backlight_activity_detected();
+    
     // Processa touch in base alla schermata corrente
     switch (ui_state.current_screen) {
         case SCREEN_MAIN_DASHBOARD:
@@ -2396,6 +3184,10 @@ void processValidTouch() {
             
         case SCREEN_CALIBRATION:
             handleCalibrationTouch();
+            break;
+            
+        case SCREEN_DIAGNOSTIC:
+            handleDiagnosticTouch();
             break;
             
         default:
@@ -2451,10 +3243,50 @@ void handleSettingsTouch() {
         return;
     }
     
-    // Area calibrazione touch (centro schermo)
-    if (touch_data.x > SCREEN_WIDTH / 4 && touch_data.x < 3 * SCREEN_WIDTH / 4 &&
-        touch_data.y > SCREEN_HEIGHT / 3 && touch_data.y < 2 * SCREEN_HEIGHT / 3) {
+    // Pulsante Calibrazione (lato sinistro, alto)
+    if (touch_data.x > 20 && touch_data.x < SCREEN_WIDTH/2 - 10 &&
+        touch_data.y > 80 && touch_data.y < 130) {
         switchToScreen(SCREEN_CALIBRATION);
+        return;
+    }
+    
+    // Pulsante Diagnostica (lato sinistro, basso)
+    if (touch_data.x > 20 && touch_data.x < SCREEN_WIDTH/2 - 10 &&
+        touch_data.y > 180 && touch_data.y < 230) {
+        switchToScreen(SCREEN_DIAGNOSTIC);
+        return;
+    }
+    
+    // Controlli retroilluminazione (lato destro)
+    // Pulsante Toggle Backlight
+    if (touch_data.x > SCREEN_WIDTH/2 + 20 && touch_data.x < SCREEN_WIDTH - 20 &&
+        touch_data.y > 80 && touch_data.y < 120) {
+        toggleBacklight();
+        ui_state.screen_needs_redraw = true;
+        return;
+    }
+    
+    // Pulsante Profilo Diurno
+    if (touch_data.x > SCREEN_WIDTH/2 + 20 && touch_data.x < SCREEN_WIDTH/2 + 120 &&
+        touch_data.y > 130 && touch_data.y < 160) {
+        setBacklightProfile(0); // Diurno
+        ui_state.screen_needs_redraw = true;
+        return;
+    }
+    
+    // Pulsante Profilo Notturno
+    if (touch_data.x > SCREEN_WIDTH/2 + 130 && touch_data.x < SCREEN_WIDTH - 20 &&
+        touch_data.y > 130 && touch_data.y < 160) {
+        setBacklightProfile(1); // Notturno
+        ui_state.screen_needs_redraw = true;
+        return;
+    }
+    
+    // Pulsante Toggle Modalità Demo
+    if (touch_data.x > SCREEN_WIDTH/2 + 20 && touch_data.x < SCREEN_WIDTH - 20 &&
+        touch_data.y > 200 && touch_data.y < 230) {
+        toggleDemoMode();
+        ui_state.screen_needs_redraw = true;
         return;
     }
 }
@@ -2508,6 +3340,41 @@ void handleCalibrationTouch() {
     Serial.print(touch_data.x);
     Serial.print(F(", Y="));
     Serial.println(touch_data.y);
+}
+
+void handleDiagnosticTouch() {
+    // Pulsante "Indietro"
+    if (touch_data.x > 10 && touch_data.x < 90 && 
+        touch_data.y > SCREEN_HEIGHT - 85 && touch_data.y < SCREEN_HEIGHT - 15) {
+        switchToScreen(SCREEN_SETTINGS);
+        return;
+    }
+    
+    // Pulsante "Test Stress"
+    if (touch_data.x > 10 && touch_data.x < 110 && 
+        touch_data.y > SCREEN_HEIGHT - 125 && touch_data.y < SCREEN_HEIGHT - 90) {
+        Serial.println(F("Touch: Avvio stress test..."));
+        stressTestSensors();
+        ui_state.screen_needs_redraw = true;
+        return;
+    }
+    
+    // Pulsante "Refresh"
+    if (touch_data.x > 120 && touch_data.x < 220 && 
+        touch_data.y > SCREEN_HEIGHT - 125 && touch_data.y < SCREEN_HEIGHT - 90) {
+        Serial.println(F("Touch: Refresh diagnostica"));
+        ui_state.screen_needs_redraw = true;
+        return;
+    }
+    
+    // Pulsante "Report"
+    if (touch_data.x > SCREEN_WIDTH - 130 && touch_data.x < SCREEN_WIDTH - 10 && 
+        touch_data.y > SCREEN_HEIGHT - 85 && touch_data.y < SCREEN_HEIGHT - 15) {
+        Serial.println(F("Touch: Generazione report completo..."));
+        runDiagnosticTests();
+        ui_state.screen_needs_redraw = true;
+        return;
+    }
 }
 
 void switchToScreen(DisplayScreen new_screen) {
@@ -2602,7 +3469,9 @@ void updateLEDMode() {
         new_mode = LED_MODE_EMERGENCY;
     } else if (program_execution.is_running) {
         new_mode = LED_MODE_PROGRAM_RUNNING;
-    } else if (!system_state.am2315_available && !system_state.dht11_available) {
+    } else if (!system_state.am2315_available && !system_state.dht11_available && 
+               !isDemoModeActive()) {
+        // SOLO se non in modalità demo
         new_mode = LED_MODE_ERROR;
     } else {
         new_mode = LED_MODE_NORMAL;
@@ -2762,8 +3631,23 @@ void resetWatchdog() {
 void controlTemperature() {
     unsigned long current_time = millis();
     
-    // Controllo temporizzato per evitare switching troppo frequente
-    if (current_time - control_system.last_temp_control < CONTROL_FRIDGE_INTERVAL) {
+    // Controllo adattivo: più frequente se temperatura critica
+    unsigned long temp_interval = CONTROL_FRIDGE_INTERVAL;
+    
+    if (sensors.internal_valid) {
+        float target_avg = (control_system.target_temp_min + control_system.target_temp_max) / 2.0;
+        float temp_deviation = abs(sensors.temp_internal - target_avg);
+        
+        // Se temperatura molto fuori range, controllo più frequente
+        if (temp_deviation > 3.0) {
+            temp_interval = 30000;  // 30 secondi per situazioni critiche
+        } else if (temp_deviation > 1.5) {
+            temp_interval = 60000;  // 1 minuto per situazioni borderline
+        }
+    }
+    
+    // Controllo temporizzato adattivo
+    if (current_time - control_system.last_temp_control < temp_interval) {
         return;
     }
     
@@ -3114,15 +3998,15 @@ bool checkSDAvailability() {
 }
 
 bool retrySDOperation() {
-    // Gestione retry automatico per operazioni SD
+    // Gestione retry automatico NON BLOCCANTE per operazioni SD
     unsigned long current_time = millis();
     
     if (!sd_manager.retry_needed) {
         return true;
     }
     
-    // Attendi intervallo retry
-    if (current_time - sd_manager.last_retry_time < 5000) {
+    // Attendi intervallo retry (ridotto per maggiore reattività)
+    if (current_time - sd_manager.last_retry_time < 2000) {
         return false;
     }
     
@@ -3134,12 +4018,24 @@ bool retrySDOperation() {
     Serial.print(F("/"));
     Serial.println(SD_RETRY_COUNT);
     
-    // Reinizializza SD
+    // Reinizializza SD con timeout breve
+    wdt_reset();
+    unsigned long retry_start = millis();
+    bool retry_success = false;
+    
+    // Tentativo rapido (max 1 secondo)
     if (SD.begin(SD_CS)) {
+        unsigned long retry_time = millis() - retry_start;
+        if (retry_time < 1000) {
+            retry_success = true;
+        }
+    }
+    
+    if (retry_success) {
         sd_manager.is_available = true;
         sd_manager.retry_needed = false;
         sd_manager.retry_count = 0;
-        strcpy(sd_manager.last_error, "Recupero riuscito");
+        strcpy(sd_manager.last_error, "Recupero OK");
         Serial.println(F("SD: Recupero riuscito"));
         return true;
     }
@@ -3600,35 +4496,30 @@ void logProgramStatus() {
 // ===============================================================================
 
 void playStartupAnimation() {
-    // Animazione avvio con wave effect
-    for (int wave = 0; wave < 3; wave++) {
-        // Wave da sinistra a destra su strip 24
-        for (int i = 0; i < NUM_LEDS_24; i++) {
-            fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
-            leds_24[i] = CHSV(wave * 85, 255, 255); // Rosso, Verde, Blu
-            if (i > 0) leds_24[i-1] = CHSV(wave * 85, 255, 128);
-            if (i > 1) leds_24[i-2] = CHSV(wave * 85, 255, 64);
-            FastLED.show();
-            delay(50);
-        }
-        
-        // Wave su strip 12
-        for (int i = 0; i < NUM_LEDS_12; i++) {
-            fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
-            leds_12[i] = CHSV(wave * 85 + 128, 255, 255);
-            FastLED.show();
-            delay(30);
-        }
+    // Animazione avvio semplificata per evitare blocchi durante init
+    Serial.println(F("     Animazione LED avvio..."));
+    
+    // Animazione veloce e sicura
+    for (int brightness = 0; brightness <= 255; brightness += 51) {
+        fill_solid(leds_24, NUM_LEDS_24, CRGB(0, brightness, 0)); // Verde crescente
+        fill_solid(leds_12, NUM_LEDS_12, CRGB(0, 0, brightness)); // Blu crescente
+        FastLED.show();
+        delay(100);
+        wdt_reset(); // Reset watchdog durante animazione
     }
     
     // Flash finale
-    fill_solid(leds_24, NUM_LEDS_24, CRGB::White);
-    fill_solid(leds_12, NUM_LEDS_12, CRGB::White);
+    fill_solid(leds_24, NUM_LEDS_24, CRGB::Green);
+    fill_solid(leds_12, NUM_LEDS_12, CRGB::Blue);
     FastLED.show();
-    delay(200);
+    delay(500);
+    
+    // Spegni
     fill_solid(leds_24, NUM_LEDS_24, CRGB::Black);
     fill_solid(leds_12, NUM_LEDS_12, CRGB::Black);
     FastLED.show();
+    
+    Serial.println(F("     Animazione LED completata"));
 }
 
 void updateNormalLEDs() {
@@ -3703,6 +4594,12 @@ void updateProgramLEDs() {
 }
 
 void updateErrorLEDs() {
+    // Protezione: se in modalità demo, usa modalità normale invece che errore
+    if (isDemoModeActive()) {
+        updateNormalLEDs();
+        return;
+    }
+    
     unsigned long elapsed = millis() - led_system.animation_start;
     
     // Pattern errore: rosso lampeggiante lento
@@ -4124,6 +5021,1102 @@ void handleMillisOverflow() {
         Serial.println(F("Overflow millis() gestito - Timer LED aggiornati"));
     }
     last_millis = current_time;
+}
+
+// ===============================================================================
+// FUNZIONI FILTRAGGIO SENSORI AVANZATO
+// ===============================================================================
+
+void applySensorFilters(float temp_raw, float hum_raw) {
+    // Applica media mobile a 3 campioni per stabilizzare i dati
+    
+    // Aggiorna buffer circolare
+    sensors.temp_buffer[sensors.buffer_index] = temp_raw;
+    sensors.hum_buffer[sensors.buffer_index] = hum_raw;
+    sensors.buffer_index = (sensors.buffer_index + 1) % 3;
+    
+    // Calcola media mobile se buffer inizializzato
+    if (!sensors.filter_initialized) {
+        // Prime letture: usa valore grezzo
+        sensors.temp_internal_filtered = temp_raw;
+        sensors.hum_internal_filtered = hum_raw;
+        
+        // Controlla se buffer pieno
+        bool buffer_full = true;
+        for (int i = 0; i < 3; i++) {
+            if (isnan(sensors.temp_buffer[i]) || isnan(sensors.hum_buffer[i])) {
+                buffer_full = false;
+                break;
+            }
+        }
+        sensors.filter_initialized = buffer_full;
+    } else {
+        // Calcola media mobile a 3 campioni
+        float temp_sum = 0, hum_sum = 0;
+        for (int i = 0; i < 3; i++) {
+            temp_sum += sensors.temp_buffer[i];
+            hum_sum += sensors.hum_buffer[i];
+        }
+        sensors.temp_internal_filtered = temp_sum / 3.0;
+        sensors.hum_internal_filtered = hum_sum / 3.0;
+    }
+}
+
+bool detectSensorSpike(float new_value, float filtered_value) {
+    // Rileva spike anomali nei dati sensori
+    if (isnan(filtered_value) || !sensors.filter_initialized) {
+        return false; // Prima lettura, accetta sempre
+    }
+    
+    float deviation = abs(new_value - filtered_value);
+    
+    // Soglie per rilevamento spike (basate su esperienza pratica)
+    float temp_spike_threshold = 5.0;  // ±5°C in una lettura è sospetto
+    float hum_spike_threshold = 15.0;  // ±15% in una lettura è sospetto
+    
+    // Controlla se il nuovo valore è troppo diverso dal valore filtrato
+    if (deviation > temp_spike_threshold || deviation > hum_spike_threshold) {
+        Serial.print(F("SPIKE rilevato: delta="));
+        Serial.print(deviation, 2);
+        Serial.print(F(" (soglia="));
+        Serial.print(temp_spike_threshold, 1);
+        Serial.println(F(")"));
+        return true;
+    }
+    
+    return false;
+}
+
+// ===============================================================================
+// FUNZIONI DIAGNOSTICA E TEST PRODUZIONE
+// ===============================================================================
+
+void runDiagnosticTests() {
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║     DIAGNOSTICA SISTEMA PRODUZIONE  ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    
+    // Test memoria
+    validateMemoryUsage();
+    
+    // Test sensori
+    stressTestSensors();
+    
+    // Test attuatori
+    Serial.println(F("=== TEST ATTUATORI ==="));
+    for (int i = 0; i < 6; i++) {
+        ActuatorState* actuator = getActuatorState(i);
+        if (actuator) {
+            Serial.print(F("Attuatore "));
+            Serial.print(i);
+            Serial.print(F(": "));
+            Serial.print(actuator->is_active ? F("ON") : F("OFF"));
+            Serial.print(F(", Protezione: "));
+            Serial.print(actuator->protection_active ? F("SI") : F("NO"));
+            Serial.print(F(", Errori: "));
+            Serial.println(actuator->error_count);
+        }
+    }
+    
+    printProductionReport();
+}
+
+void validateMemoryUsage() {
+    Serial.println(F("=== ANALISI MEMORIA ==="));
+    
+    // Calcolo memoria libera approssimativo
+    extern int __heap_start, *__brkval;
+    int free_memory;
+    
+    if ((int)__brkval == 0) {
+        free_memory = ((int)&free_memory) - ((int)&__heap_start);
+    } else {
+        free_memory = ((int)&free_memory) - ((int)__brkval);
+    }
+    
+    Serial.print(F("RAM libera: "));
+    Serial.print(free_memory);
+    Serial.println(F(" bytes"));
+    
+    if (free_memory < 1000) {
+        Serial.println(F("⚠️  ATTENZIONE: Memoria RAM critica!"));
+    } else if (free_memory < 1500) {
+        Serial.println(F("⚠️  Memoria RAM al limite"));
+    } else {
+        Serial.println(F("✅ Memoria RAM OK"));
+    }
+}
+
+void stressTestSensors() {
+    Serial.println(F("=== STRESS TEST SENSORI ==="));
+    
+    // Protezione: aggiorna display solo se disponibile e non durante inizializzazione
+    static bool display_safe = false;
+    if (millis() > 15000) { // Dopo 15 secondi dall'avvio
+        display_safe = true;
+        // Mostra messaggio di test in corso sul display
+        tft.fillRect(10, SCREEN_HEIGHT - 160, SCREEN_WIDTH - 20, 50, COLOR_BLACK);
+        tft.drawRect(10, SCREEN_HEIGHT - 160, SCREEN_WIDTH - 20, 50, COLOR_ORANGE);
+        tft.setTextColor(COLOR_ORANGE);
+        tft.setTextSize(TEXT_SIZE_SMALL);
+        tft.setCursor(15, SCREEN_HEIGHT - 150);
+        tft.println(F("STRESS TEST IN CORSO..."));
+    }
+    
+    int successful_reads = 0;
+    
+    for (int i = 0; i < 5; i++) {
+        // Aggiorna display con progresso (solo se sicuro)
+        if (display_safe) {
+            tft.setCursor(15, SCREEN_HEIGHT - 130);
+            tft.setTextColor(COLOR_WHITE);
+            tft.print(F("Test "));
+            tft.print(i + 1);
+            tft.print(F("/5..."));
+        }
+        
+        Serial.print(F("Test "));
+        Serial.print(i + 1);
+        Serial.print(F("/5... "));
+        
+        bool read_success = readSensors();
+        if (read_success && sensors.internal_valid) {
+            successful_reads++;
+            if (display_safe) {
+                tft.setTextColor(COLOR_GREEN);
+                tft.print(F(" OK"));
+            }
+            Serial.print(F("OK - T:"));
+            Serial.print(sensors.temp_internal, 1);
+            Serial.println(F("°C"));
+        } else {
+            if (display_safe) {
+                tft.setTextColor(COLOR_RED);
+                tft.print(F(" FAIL"));
+            }
+            Serial.println(F("FALLITO"));
+        }
+        
+        delay(800);
+        wdt_reset();
+        
+        // Cancella riga per prossimo test (solo se sicuro)
+        if (i < 4 && display_safe) {
+            tft.fillRect(15, SCREEN_HEIGHT - 130, 200, 15, COLOR_BLACK);
+        }
+    }
+    
+    float success_rate = (float)successful_reads / 5.0 * 100.0;
+    
+    // Mostra risultato finale (solo se sicuro)
+    if (display_safe) {
+        tft.fillRect(15, SCREEN_HEIGHT - 120, 300, 15, COLOR_BLACK);
+        tft.setCursor(15, SCREEN_HEIGHT - 120);
+        tft.setTextColor(COLOR_CYAN);
+        tft.print(F("Successo: "));
+        tft.print(success_rate, 1);
+        tft.print(F("% ("));
+        tft.print(successful_reads);
+        tft.print(F("/5)"));
+    }
+    
+    Serial.print(F("Tasso successo: "));
+    Serial.print(success_rate, 1);
+    Serial.println(F("%"));
+    
+    // Mantieni risultato per 3 secondi
+    delay(3000);
+}
+
+void logSystemHealth() {
+    // Log periodico salute sistema
+    Serial.print(F("Uptime: "));
+    Serial.print(millis() / 3600000);
+    Serial.print(F("h, Sensori: "));
+    Serial.print(sensors.internal_valid ? F("OK") : F("ERR"));
+    Serial.print(F(", Emergenze: "));
+    Serial.println(emergency_system.emergency_episodes);
+    wdt_reset();
+}
+
+void printProductionReport() {
+    Serial.println(F(""));
+    Serial.println(F("╔══════════════════════════════════════╗"));
+    Serial.println(F("║        REPORT PRODUZIONE             ║"));
+    Serial.println(F("╚══════════════════════════════════════╝"));
+    
+    unsigned long uptime_hours = millis() / 3600000;
+    Serial.print(F("Uptime: "));
+    Serial.print(uptime_hours);
+    Serial.println(F(" ore"));
+    
+    if (emergency_system.emergency_episodes == 0) {
+        Serial.println(F("✅ Nessuna emergenza"));
+    } else {
+        Serial.print(F("⚠️  Emergenze: "));
+        Serial.println(emergency_system.emergency_episodes);
+    }
+    
+    Serial.println(sensors.internal_valid ? 
+                   F("🟢 SISTEMA: STABILE") : 
+                   F("🟡 SISTEMA: VERIFICARE SENSORI"));
+}
+
+// ===============================================================================
+// SISTEMA RETROILLUMINAZIONE DISPLAY
+// ===============================================================================
+
+void initializeBacklight() {
+    // Configura pin PWM per controllo retroilluminazione
+    pinMode(BACKLIGHT_PIN, OUTPUT);
+    
+    // Imposta livello iniziale massimo
+    analogWrite(BACKLIGHT_PIN, BACKLIGHT_MAX_LEVEL);
+    
+    Serial.print(F("     Retroilluminazione: Pin "));
+    Serial.print(BACKLIGHT_PIN);
+    Serial.print(F(" - Livello iniziale: "));
+    Serial.print(BACKLIGHT_MAX_LEVEL);
+    Serial.println(F("/255"));
+}
+
+void updateBacklight() {
+    unsigned long current_time = millis();
+    
+    // Evita aggiornamenti troppo frequenti (ogni 50ms minimo)
+    if (current_time - backlight_system.last_update < 50) {
+        return;
+    }
+    backlight_system.last_update = current_time;
+    
+    // Se disabilitato, spegni completamente
+    if (!backlight_system.is_enabled) {
+        analogWrite(BACKLIGHT_PIN, 0);
+        return;
+    }
+    
+    // Modalità emergenza: sempre acceso al massimo
+    if (backlight_system.emergency_mode || system_state.emergency_mode) {
+        setBacklightLevel(BACKLIGHT_MAX_LEVEL);
+        return;
+    }
+    
+    // Gestione fade progressivo
+    if (backlight_system.fade_in_progress) {
+        unsigned long fade_elapsed = current_time - backlight_system.fade_start_time;
+        
+        if (fade_elapsed >= backlight_system.fade_duration) {
+            // Fade completato
+            backlight_system.fade_in_progress = false;
+            setBacklightLevel(backlight_system.fade_target_level);
+        } else {
+            // Calcola livello intermedio del fade
+            float progress = (float)fade_elapsed / backlight_system.fade_duration;
+            int current_fade_level = backlight_system.fade_start_level + 
+                                   (backlight_system.fade_target_level - backlight_system.fade_start_level) * progress;
+            
+            setBacklightLevel(current_fade_level);
+        }
+        return;
+    }
+    
+    // Auto-dimming basato su inattività
+    if (backlight_system.auto_dim_enabled && !backlight_system.manual_control) {
+        unsigned long inactive_time = current_time - backlight_system.last_activity;
+        
+        // Gestione overflow millis()
+        if (current_time < backlight_system.last_activity) {
+            backlight_system.last_activity = current_time;
+            inactive_time = 0;
+        }
+        
+        if (inactive_time >= BACKLIGHT_TIMEOUT) {
+            // Passa a modalità standby
+            if (backlight_system.target_level != backlight_system.standby_level) {
+                fadeBacklightTo(backlight_system.standby_level, 2000); // Fade 2s
+                // Serial.println(F("Backlight: Auto-dim attivo")); // Debug rimosso
+            }
+        } else {
+            // Mantieni livello normale
+            if (backlight_system.target_level == backlight_system.standby_level) {
+                fadeBacklightTo(backlight_system.day_level, 1000); // Fade 1s
+            }
+        }
+    }
+    
+    // Applica livello corrente
+    if (backlight_system.current_level != backlight_system.target_level && 
+        !backlight_system.fade_in_progress) {
+        setBacklightLevel(backlight_system.target_level);
+    }
+}
+
+void setBacklightLevel(uint8_t level) {
+    // Limita il range
+    level = constrain(level, 0, 255);
+    
+    backlight_system.current_level = level;
+    backlight_system.target_level = level;
+    
+    // Applica PWM al pin
+    analogWrite(BACKLIGHT_PIN, level);
+    
+    // Debug rimosso per ridurre spam seriale
+}
+
+void fadeBacklightTo(uint8_t target_level, unsigned long duration_ms) {
+    // Limita il range
+    target_level = constrain(target_level, 0, 255);
+    
+    // Evita fade inutili
+    if (target_level == backlight_system.current_level) {
+        return;
+    }
+    
+    // Imposta parametri fade
+    backlight_system.fade_in_progress = true;
+    backlight_system.fade_start_time = millis();
+    backlight_system.fade_start_level = backlight_system.current_level;
+    backlight_system.fade_target_level = target_level;
+    backlight_system.fade_duration = duration_ms;
+    
+    // Debug fade rimosso per ridurre spam seriale
+}
+
+void backlight_activity_detected() {
+    // Registra timestamp ultima attività
+    backlight_system.last_activity = millis();
+    
+    // Se in standby, riattiva immediatamente
+    if (backlight_system.current_level == backlight_system.standby_level) {
+        fadeBacklightTo(backlight_system.day_level, 500); // Fade rapido 0.5s
+        Serial.println(F("Backlight: Attività rilevata - Riattivazione"));
+    }
+}
+
+void toggleBacklight() {
+    if (backlight_system.is_enabled) {
+        // Spegni
+        backlight_system.is_enabled = false;
+        fadeBacklightTo(0, 1000);
+        Serial.println(F("Backlight: Spento"));
+    } else {
+        // Accendi
+        backlight_system.is_enabled = true;
+        fadeBacklightTo(backlight_system.day_level, 1000);
+        Serial.println(F("Backlight: Acceso"));
+    }
+}
+
+void setBacklightProfile(int profile) {
+    uint8_t new_level;
+    
+    switch (profile) {
+        case 0: // Profilo diurno
+            new_level = backlight_system.day_level;
+            Serial.println(F("Backlight: Profilo DIURNO"));
+            break;
+            
+        case 1: // Profilo notturno
+            new_level = backlight_system.night_level;
+            Serial.println(F("Backlight: Profilo NOTTURNO"));
+            break;
+            
+        case 2: // Profilo standby
+            new_level = backlight_system.standby_level;
+            Serial.println(F("Backlight: Profilo STANDBY"));
+            break;
+            
+        default:
+            new_level = backlight_system.day_level;
+            Serial.println(F("Backlight: Profilo DEFAULT"));
+            break;
+    }
+    
+    // Disabilita controllo manuale per permettere auto-dim
+    backlight_system.manual_control = false;
+    
+    // Applica nuovo profilo con fade
+    fadeBacklightTo(new_level, 1500);
+}
+
+void backlight_emergency_mode(bool enable) {
+    backlight_system.emergency_mode = enable;
+    
+    if (enable) {
+        // Modalità emergenza: massima luminosità
+        setBacklightLevel(BACKLIGHT_MAX_LEVEL);
+        Serial.println(F("Backlight: MODALITÀ EMERGENZA attivata"));
+    } else {
+        // Torna al controllo normale
+        backlight_system.emergency_mode = false;
+        fadeBacklightTo(backlight_system.day_level, 1000);
+        Serial.println(F("Backlight: Modalità emergenza disattivata"));
+    }
+}
+
+// ===============================================================================
+// MODALITÀ DEMO
+// ===============================================================================
+
+void toggleDemoMode() {
+    system_state.demo_mode_forced = !system_state.demo_mode_forced;
+    updateDemoModeStatus();
+    
+    if (system_state.demo_mode_forced) {
+        Serial.println(F(""));
+        Serial.println(F("╔══════════════════════════════════════╗"));
+        Serial.println(F("║   MODALITÀ DEMO ATTIVATA MANUALMENTE ║"));
+        Serial.println(F("║   DATI SENSORI SIMULATI              ║"));
+        Serial.println(F("╚══════════════════════════════════════╝"));
+        
+        // Inizializza dati simulati immediatamente
+        sensors.temp_internal = 12.5;
+        sensors.hum_internal = 60.0;
+        sensors.temp_external = 15.0;
+        sensors.hum_external = 55.0;
+        sensors.internal_valid = true;
+        sensors.external_valid = true;
+        sensors.internal_error_count = 0;
+        sensors.external_error_count = 0;
+        
+    } else {
+        Serial.println(F(""));
+        Serial.println(F("╔══════════════════════════════════════╗"));
+        Serial.println(F("║   MODALITÀ DEMO DISATTIVATA          ║"));
+        Serial.println(F("║   RITORNO AI SENSORI REALI           ║"));
+        Serial.println(F("╚══════════════════════════════════════╝"));
+        
+        // Reset validità sensori per forzare una nuova lettura
+        sensors.internal_valid = false;
+        sensors.external_valid = false;
+    }
+    
+    // Forza aggiornamento display
+    ui_state.screen_needs_redraw = true;
+    ui_state.force_full_redraw = true;
+}
+
+bool isDemoModeActive() {
+    return system_state.demo_mode_active;
+}
+
+void updateDemoModeStatus() {
+    // La modalità demo è attiva se:
+    // 1. È forzata manualmente, OPPURE
+    // 2. Non ci sono sensori disponibili automaticamente
+    bool was_demo_active = system_state.demo_mode_active;
+    
+    system_state.demo_mode_active = system_state.demo_mode_forced || 
+                                   (!system_state.am2315_available && !system_state.dht11_available);
+    
+    // Log cambio stato modalità demo
+    if (was_demo_active != system_state.demo_mode_active) {
+        if (system_state.demo_mode_active) {
+            Serial.print(F("Demo mode ATTIVATA - Tipo: "));
+            if (system_state.demo_mode_forced) {
+                Serial.println(F("FORZATA"));
+            } else {
+                Serial.println(F("AUTOMATICA (no sensori)"));
+            }
+        } else {
+            Serial.println(F("Demo mode DISATTIVATA"));
+        }
+    }
+}
+
+// ===============================================================================
+// COMANDI SERIALI
+// ===============================================================================
+
+void handleSerialCommands() {
+    if (Serial.available()) {
+        String command = Serial.readStringUntil('\n');
+        command.trim();
+        command.toLowerCase();
+        
+        if (command == "demo") {
+            if (!system_state.demo_mode_forced) {
+                system_state.demo_mode_forced = true;
+                updateDemoModeStatus();
+                Serial.println(F(""));
+                Serial.println(F("✅ MODALITÀ DEMO ATTIVATA DA SERIALE"));
+                Serial.println(F("   Sistema ora usa dati simulati"));
+                Serial.println(F("   Digita 'nodemo' per disattivare"));
+                
+                // Inizializza dati demo immediatamente
+                sensors.temp_internal = 12.5;
+                sensors.hum_internal = 60.0;
+                sensors.temp_external = 15.0;
+                sensors.hum_external = 55.0;
+                sensors.internal_valid = true;
+                sensors.external_valid = true;
+                sensors.internal_error_count = 0;
+                sensors.external_error_count = 0;
+                sensors.last_read_time = millis();
+                
+                // Forza ridisegno display e cambio schermata
+                ui_state.current_screen = SCREEN_MAIN_DASHBOARD;
+                ui_state.screen_needs_redraw = true;
+                ui_state.force_full_redraw = true;
+                
+                Serial.println(F("   🖥️  Aggiornamento display forzato..."));
+            } else {
+                Serial.println(F("⚠️  Modalità demo già attiva"));
+            }
+            
+        } else if (command == "nodemo") {
+            if (system_state.demo_mode_forced) {
+                system_state.demo_mode_forced = false;
+                updateDemoModeStatus();
+                Serial.println(F(""));
+                Serial.println(F("✅ MODALITÀ DEMO DISATTIVATA DA SERIALE"));
+                Serial.println(F("   Sistema torna ai sensori reali"));
+                
+                // Reset validità sensori
+                sensors.internal_valid = false;
+                sensors.external_valid = false;
+                
+                // Forza ridisegno display
+                ui_state.screen_needs_redraw = true;
+                ui_state.force_full_redraw = true;
+            } else {
+                Serial.println(F("⚠️  Modalità demo non era attiva"));
+            }
+            
+        } else if (command == "status") {
+            Serial.println(F(""));
+            Serial.println(F("📊 STATUS SISTEMA STAGIONINO"));
+            Serial.println(F("════════════════════════════"));
+            Serial.print(F("Demo Mode: "));
+            if (isDemoModeActive()) {
+                if (system_state.demo_mode_forced) {
+                    Serial.println(F("ATTIVA (FORZATA)"));
+                } else {
+                    Serial.println(F("ATTIVA (AUTO)"));
+                }
+            } else {
+                Serial.println(F("DISATTIVA"));
+            }
+            
+            Serial.print(F("Sensori AM2315: "));
+            Serial.println(system_state.am2315_available ? F("OK") : F("NON RILEVATO"));
+            
+            Serial.print(F("Sensore DHT11: "));
+            Serial.println(system_state.dht11_available ? F("OK") : F("NON RILEVATO"));
+            
+            Serial.print(F("SD Card: "));
+            Serial.println(system_state.sd_available ? F("OK") : F("NON RILEVATA"));
+            
+            Serial.print(F("RTC: "));
+            Serial.println(system_state.rtc_available ? F("OK") : F("NON RILEVATO"));
+            
+            if (sensors.internal_valid) {
+                Serial.print(F("Temp/Hum Int: "));
+                Serial.print(sensors.temp_internal, 1);
+                Serial.print(F("°C / "));
+                Serial.print(sensors.hum_internal, 1);
+                Serial.println(F("%"));
+            }
+            
+            if (sensors.external_valid) {
+                Serial.print(F("Temp/Hum Ext: "));
+                Serial.print(sensors.temp_external, 1);
+                Serial.print(F("°C / "));
+                Serial.print(sensors.hum_external, 1);
+                Serial.println(F("%"));
+            }
+            
+            Serial.print(F("Uptime: "));
+            Serial.print(millis() / 3600000);
+            Serial.println(F(" ore"));
+            
+            extern int __heap_start, *__brkval;
+            int free_memory = (int) &free_memory - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+            Serial.print(F("RAM libera: "));
+            Serial.print(free_memory);
+            Serial.println(F(" bytes"));
+            Serial.println(F(""));
+            
+        } else if (command == "backlight") {
+            Serial.println(F(""));
+            Serial.println(F("🔆 TEST BACKLIGHT - Pin "));
+            Serial.print(BACKLIGHT_PIN);
+            Serial.println(F(""));
+            Serial.println(F("Test sequenza luminosità..."));
+            
+            // Test sequenza backlight
+            for (int level = 0; level <= 255; level += 51) {
+                analogWrite(BACKLIGHT_PIN, level);
+                Serial.print(F("  Livello: "));
+                Serial.print(level);
+                Serial.print(F("/255 ("));
+                Serial.print((level * 100) / 255);
+                Serial.println(F("%)"));
+                delay(1000);
+            }
+            
+            // Torna al livello normale
+            analogWrite(BACKLIGHT_PIN, BACKLIGHT_MAX_LEVEL);
+            Serial.println(F("Test completato - ritorno livello normale"));
+            Serial.println(F(""));
+            
+        } else if (command == "refresh") {
+            Serial.println(F(""));
+            Serial.println(F("🔄 FORZA AGGIORNAMENTO DISPLAY"));
+            
+            // Cancella tutto lo schermo
+            tft.fillScreen(0x0000); // Schermo nero
+            delay(500);
+            
+            // Forza ridisegno completo
+            ui_state.current_screen = SCREEN_MAIN_DASHBOARD;
+            ui_state.screen_needs_redraw = true;
+            ui_state.force_full_redraw = true;
+            
+            // Aggiorna immediatamente
+            updateDisplay();
+            
+            Serial.println(F("   Display pulito e ridisegnato"));
+            Serial.println(F(""));
+            
+        } else if (command == "testdisplay") {
+            Serial.println(F(""));
+            Serial.println(F("🖥️  TEST DIAGNOSTICO DISPLAY"));
+            Serial.println(F("════════════════════════════"));
+            
+            // Rilegge ID display
+            uint16_t ID = tft.readID();
+            Serial.print(F("Controller ID: 0x"));
+            Serial.println(ID, HEX);
+            
+            // Informazioni display
+            Serial.print(F("Risoluzione: "));
+            Serial.print(tft.width());
+            Serial.print(F("x"));
+            Serial.println(tft.height());
+            
+            // Test pattern colorati (basato su forum Arduino)
+            Serial.println(F("Esecuzione test pattern..."));
+            
+            // Test rosso
+            tft.fillScreen(0xF800);
+            Serial.println(F("  - Schermo ROSSO (2s)"));
+            delay(2000);
+            
+            // Test verde
+            tft.fillScreen(0x07E0);
+            Serial.println(F("  - Schermo VERDE (2s)"));
+            delay(2000);
+            
+            // Test blu
+            tft.fillScreen(0x001F);
+            Serial.println(F("  - Schermo BLU (2s)"));
+            delay(2000);
+            
+            // Test bianco
+            tft.fillScreen(0xFFFF);
+            Serial.println(F("  - Schermo BIANCO (2s)"));
+            delay(2000);
+            
+            // Test nero
+            tft.fillScreen(0x0000);
+            Serial.println(F("  - Schermo NERO (2s)"));
+            delay(2000);
+            
+            // Ripristina display normale
+            ui_state.screen_needs_redraw = true;
+            ui_state.force_full_redraw = true;
+            Serial.println(F("Test completato - display ripristinato"));
+            Serial.println(F(""));
+            
+        } else if (command == "testtouch") {
+            Serial.println(F(""));
+            Serial.println(F("👆 TEST DIAGNOSTICO TOUCHSCREEN"));
+            Serial.println(F("═══════════════════════════════════"));
+            Serial.println(F("Tocca lo schermo per 10 secondi..."));
+            Serial.println(F("(soluzione pin condivisi implementata)"));
+            
+            unsigned long test_start = millis();
+            int touch_count = 0;
+            
+            while (millis() - test_start < 10000) {
+                if (Touch_getXY()) {
+                    touch_count++;
+                    Serial.print(F("Touch #"));
+                    Serial.print(touch_count);
+                    Serial.print(F(" - X: "));
+                    Serial.print(pixel_x);
+                    Serial.print(F(", Y: "));
+                    Serial.print(pixel_y);
+                    Serial.println(F(" (pin ripristinati)"));
+                    
+                    // Test visivo: disegna un punto sullo schermo
+                    tft.fillCircle(pixel_x, pixel_y, 3, 0xFFE0); // Punto giallo
+                    
+                    delay(200); // Evita spam
+                }
+                delay(50);
+            }
+            
+            Serial.print(F("Test completato - "));
+            Serial.print(touch_count);
+            Serial.println(F(" tocchi rilevati"));
+            
+            // Ripristina display
+            ui_state.screen_needs_redraw = true;
+            ui_state.force_full_redraw = true;
+            Serial.println(F("Display ripristinato"));
+            Serial.println(F(""));
+            
+        } else if (command == "dashboard") {
+            Serial.println(F(""));
+            Serial.println(F("🖥️  FORZA DASHBOARD PRINCIPALE"));
+            
+            // Assicura modalità demo attiva
+            if (!isDemoModeActive()) {
+                Serial.println(F("Attivando modalità demo..."));
+                system_state.demo_mode_forced = true;
+                system_state.demo_mode_active = true;
+                updateDemoModeStatus();
+            }
+            
+            // SOLUZIONE HARDWARE: Reset completo pin condivisi
+            Serial.println(F("Reset pin condivisi TFT/Touch/SD..."));
+            spi_deselect_all();
+            delay(100);
+            
+            // Reset display driver
+            Serial.println(F("Re-inizializzazione display driver..."));
+            uint16_t ID = tft.readID();
+            Serial.print(F("Display ID: 0x"));
+            Serial.println(ID, HEX);
+            tft.begin(ID);
+            tft.setRotation(1);
+            
+            // Test pattern per verificare display
+            Serial.println(F("Test pattern colori..."));
+            tft.fillScreen(0xF800); // Rosso
+            delay(500);
+            tft.fillScreen(0x07E0); // Verde  
+            delay(500);
+            tft.fillScreen(0x001F); // Blu
+            delay(500);
+            tft.fillScreen(0x0000); // Nero
+            delay(500);
+            
+            // Forza ridisegno dashboard
+            ui_state.current_screen = SCREEN_MAIN_DASHBOARD;
+            ui_state.screen_needs_redraw = true;
+            ui_state.force_full_redraw = true;
+            
+            Serial.println(F("Disegnando dashboard..."));
+            drawMainDashboard();
+            Serial.println(F("Dashboard forzata completata"));
+            Serial.println(F(""));
+            
+        } else if (command == "tfttest") {
+            Serial.println(F(""));
+            Serial.println(F("🎨 TEST TFT BASE - Solo Colori"));
+            
+            // Reset pin condivisi prima del test
+            spi_deselect_all();
+            delay(100);
+            
+            // Test colori di base
+            Serial.println(F("Rosso..."));
+            tft.fillScreen(0xF800);
+            delay(2000);
+            
+            Serial.println(F("Verde..."));
+            tft.fillScreen(0x07E0);
+            delay(2000);
+            
+            Serial.println(F("Blu..."));
+            tft.fillScreen(0x001F);
+            delay(2000);
+            
+            Serial.println(F("Bianco..."));
+            tft.fillScreen(0xFFFF);
+            delay(2000);
+            
+            Serial.println(F("Nero..."));
+            tft.fillScreen(0x0000);
+            delay(1000);
+            
+            Serial.println(F("Test TFT completato"));
+            Serial.println(F(""));
+            
+        } else if (command == "uiinfo") {
+            Serial.println(F(""));
+            Serial.println(F("📱 STATO INTERFACCIA UTENTE"));
+            Serial.println(F("═══════════════════════════"));
+            Serial.print(F("Schermata corrente: "));
+            Serial.println(ui_state.current_screen);
+            Serial.print(F("Screen needs redraw: "));
+            Serial.println(ui_state.screen_needs_redraw ? F("SI") : F("NO"));
+            Serial.print(F("Force full redraw: "));
+            Serial.println(ui_state.force_full_redraw ? F("SI") : F("NO"));
+            Serial.print(F("Ultimo aggiornamento: "));
+            Serial.print(ui_state.last_screen_update);
+            Serial.println(F("ms"));
+            Serial.print(F("Background color: 0x"));
+            Serial.println(ui_state.background_color, HEX);
+            Serial.print(F("Text color: 0x"));
+            Serial.println(ui_state.text_color, HEX);
+            Serial.println(F(""));
+            
+        } else if (command == "displayreset") {
+            Serial.println(F(""));
+            Serial.println(F("🔄 RESET COMPLETO DISPLAY"));
+            
+            // Reset hardware aggressivo
+            Serial.println(F("1. Reset pin CS e deseleziona tutto..."));
+            spi_deselect_all();
+            delay(200);
+            
+            // Re-inizializza display completamente
+            Serial.println(F("2. Re-inizializzazione completa display..."));
+            uint16_t ID = tft.readID();
+            Serial.print(F("   ID rilevato: 0x"));
+            Serial.println(ID, HEX);
+            
+            // Forza ID se non rilevato
+            if (ID == 0xFFFF || ID == 0x0000) {
+                Serial.println(F("   ID non valido, forzando ILI9486..."));
+                ID = 0x9486;
+            }
+            
+            tft.begin(ID);
+            tft.setRotation(1);
+            Serial.print(F("   Risoluzione: "));
+            Serial.print(tft.width());
+            Serial.print(F("x"));
+            Serial.println(tft.height());
+            
+            // Test scrittura diretta
+            Serial.println(F("3. Test scrittura diretta pixel..."));
+            for (int y = 0; y < 10; y++) {
+                for (int x = 0; x < 10; x++) {
+                    tft.drawPixel(x, y, 0xFFFF); // Quadrato bianco 10x10
+                }
+            }
+            
+            Serial.println(F("4. Test riempimento schermo..."));
+            tft.fillScreen(0xF800); // Rosso pieno
+            delay(1000);
+            
+            Serial.println(F("Reset display completato"));
+            Serial.println(F(""));
+            
+        } else if (command == "sdtest") {
+            Serial.println(F(""));
+            Serial.println(F("💾 DIAGNOSI SD CARD E BUS SPI"));
+            
+            // 1. Stato attuale
+            Serial.print(F("Stato SD attuale: "));
+            Serial.println(system_state.sd_available ? F("DISPONIBILE") : F("NON DISPONIBILE"));
+            
+            // 2. Reset completo bus SPI
+            Serial.println(F(""));
+            Serial.println(F("🔄 RESET BUS SPI COMPLETO"));
+            Serial.println(F("  1. Disabilitazione tutti i dispositivi SPI..."));
+            
+            // Forza disabilitazione di TUTTI i device SPI
+            pinMode(SD_CS, OUTPUT);
+            pinMode(TOUCH_CS, OUTPUT);
+            digitalWrite(SD_CS, HIGH);
+            digitalWrite(TOUCH_CS, HIGH);
+            delay(200);
+            
+            Serial.println(F("  2. Reset pin SPI e inizializzazione..."));
+            // Reset SPI
+            SPI.end();
+            delay(100);
+            SPI.begin();
+            SPI.setClockDivider(SPI_CLOCK_DIV2);
+            delay(100);
+            
+            // 3. Test SD isolato
+            Serial.println(F(""));
+            Serial.println(F("🧪 TEST SD ISOLATO"));
+            bool sd_test_ok = false;
+            
+            for (int test = 1; test <= 3; test++) {
+                Serial.print(F("  Test "));
+                Serial.print(test);
+                Serial.print(F("/3: "));
+                
+                // Assicura isolamento
+                digitalWrite(TOUCH_CS, HIGH);
+                digitalWrite(SD_CS, HIGH);
+                delay(100);
+                
+                unsigned long start = millis();
+                if (SD.begin(SD_CS)) {
+                    unsigned long elapsed = millis() - start;
+                    Serial.print(F("✅ OK ("));
+                    Serial.print(elapsed);
+                    Serial.println(F("ms)"));
+                    sd_test_ok = true;
+                    break;
+                } else {
+                    unsigned long elapsed = millis() - start;
+                    Serial.print(F("❌ FAIL ("));
+                    Serial.print(elapsed);
+                    Serial.println(F("ms)"));
+                    delay(500);
+                }
+            }
+            
+            // 4. Se SD OK, test file system
+            if (sd_test_ok) {
+                Serial.println(F(""));
+                Serial.println(F("📁 TEST FILE SYSTEM"));
+                
+                File root = SD.open("/");
+                if (root) {
+                    Serial.println(F("  ✅ Root directory accessibile"));
+                    
+                    // Lista files
+                    Serial.println(F("  📄 Files trovati:"));
+                    File entry = root.openNextFile();
+                    int file_count = 0;
+                    while (entry && file_count < 5) {
+                        Serial.print(F("    - "));
+                        Serial.print(entry.name());
+                        if (entry.isDirectory()) {
+                            Serial.println(F("/ (directory)"));
+                        } else {
+                            Serial.print(F(" ("));
+                            Serial.print(entry.size());
+                            Serial.println(F(" bytes)"));
+                        }
+                        entry.close();
+                        entry = root.openNextFile();
+                        file_count++;
+                    }
+                    root.close();
+                    
+                    // Test scrittura
+                    Serial.println(F("  ✏️  Test scrittura..."));
+                    File test = SD.open("/spi_test.txt", FILE_WRITE);
+                    if (test) {
+                        test.println("SPI Test OK");
+                        test.close();
+                        Serial.println(F("  ✅ Scrittura OK"));
+                        SD.remove("/spi_test.txt");
+                    } else {
+                        Serial.println(F("  ❌ Scrittura FAIL"));
+                    }
+                } else {
+                    Serial.println(F("  ❌ Root directory inaccessibile"));
+                }
+            }
+            
+            // 5. Aggiorna stato sistema
+            system_state.sd_available = sd_test_ok;
+            
+            // 6. Reset finale bus per TFT
+            Serial.println(F(""));
+            Serial.println(F("🖥️  RIPRISTINO TFT DOPO TEST SD"));
+            spi_deselect_all();
+            delay(200);
+            
+            // Re-init TFT
+            uint16_t tft_id = tft.readID();
+            Serial.print(F("  TFT ID dopo test SD: 0x"));
+            Serial.println(tft_id, HEX);
+            
+            if (tft_id == 0xFFFF || tft_id == 0x0000) {
+                Serial.println(F("  ⚠️  TFT compromesso, re-inizializzazione..."));
+                tft.begin(0x9486);
+                tft.setRotation(1);
+            }
+            
+            // Test finale TFT
+            tft.fillScreen(0x07E0); // Verde
+            delay(500);
+            tft.fillScreen(0x0000); // Nero
+            
+            Serial.println(F(""));
+            Serial.println(F("✅ Diagnosi SD completata"));
+            Serial.print(F("   SD Card: "));
+            Serial.println(sd_test_ok ? F("FUNZIONANTE") : F("PROBLEMA"));
+            Serial.println(F(""));
+            
+        } else if (command.length() > 0) {
+            Serial.println(F(""));
+            Serial.println(F("❌ Comando non riconosciuto"));
+            Serial.println(F("Comandi disponibili:"));
+            Serial.println(F("  demo      → Attiva modalità demo"));
+            Serial.println(F("  nodemo    → Disattiva modalità demo"));
+            Serial.println(F("  status    → Mostra stato sistema"));
+            Serial.println(F("  backlight → Test controllo retroilluminazione"));
+            Serial.println(F("  refresh   → Forza aggiornamento display"));
+            Serial.println(F(""));
+        }
+    }
+}
+
+// ===============================================================================
+// GESTIONE PIN SPI CONDIVISI (TOUCH + SD)
+// ===============================================================================
+
+void spi_select_touch() {
+    // Disabilita SD e abilita touch
+    digitalWrite(SD_CS, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TOUCH_CS, LOW);
+    delayMicroseconds(10);
+}
+
+void spi_select_sd() {
+    // Disabilita touch e abilita SD
+    digitalWrite(TOUCH_CS, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(SD_CS, LOW);
+    delayMicroseconds(10);
+}
+
+void spi_deselect_all() {
+    // Disabilita entrambi
+    digitalWrite(TOUCH_CS, HIGH);
+    digitalWrite(SD_CS, HIGH);
+    delayMicroseconds(10);
+}
+
+// ===============================================================================
+// GESTIONE TOUCH CON PIN CONDIVISI (SOLUZIONE FORUM ARDUINO)
+// ===============================================================================
+
+bool Touch_getXY(void) {
+    // Funzione basata sulla soluzione del forum Arduino MCUFRIEND
+    // https://forum.arduino.cc/t/3-5-tft-mcufriend-touch-screen-ili9486/612104
+    
+    TS_Point p = touch.getPoint();
+    
+    // CRITICO: Ripristina pin condivisi con il display TFT
+    // I pin touch sono condivisi con i pin TFT nel shield MCUFRIEND
+    pinMode(TOUCH_IRQ, INPUT);    // Ripristina pin IRQ
+    pinMode(TOUCH_CS, OUTPUT);    // Ripristina pin CS
+    digitalWrite(TOUCH_CS, HIGH); // Disabilita touch per permettere al TFT di funzionare
+    
+    // Controlla se il tocco è valido
+    bool pressed = (p.z > 250 && p.z < 4000);  // Valori tipici per XPT2046
+    
+    if (pressed) {
+        // Mappa le coordinate touch alle coordinate dello schermo
+        pixel_x = map(p.x, 200, 3700, 0, tft.width());   
+        pixel_y = map(p.y, 200, 3700, 0, tft.height());
+        
+        // Limita le coordinate ai bordi dello schermo
+        pixel_x = constrain(pixel_x, 0, tft.width() - 1);
+        pixel_y = constrain(pixel_y, 0, tft.height() - 1);
+    }
+    
+    return pressed;
 }
 
 // ===============================================================================

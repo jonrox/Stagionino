@@ -68,21 +68,21 @@ TOUCHSCREEN XPT2046 (SPI):
     GND ──── XPT2046 GND
 
 SENSORI:
-    D2  ──── DHT11 DATA
+    D28 ──── DHT11 DATA (aggiornato da D2)
     5V  ──── DHT11 VCC
     GND ──── DHT11 GND
 
 LED INDICATORI:
-    D6  ──── WS2812B 24bit DATA
+    D30 ──── WS2812B 24bit DATA (aggiornato da D6)
     5V  ──── WS2812B 24bit VCC
     GND ──── WS2812B 24bit GND
     
-    D7  ──── WS2812B 12bit DATA
+    D32 ──── WS2812B 12bit DATA (aggiornato da D7)
     5V  ──── WS2812B 12bit VCC
     GND ──── WS2812B 12bit GND
 
 BUZZER (PASSIVO PIEZO 5V):
-    D12 ──── BUZZER PASSIVO DATA (PWM/tone)
+    D34 ──── BUZZER PASSIVO DATA (PWM/tone) (aggiornato da D12)
     5V  ──── BUZZER VCC
     GND ──── BUZZER GND
 
@@ -108,7 +108,7 @@ AM2315C (I2C):
 DHT11:
     VCC ──── 5V
     GND ──── GND
-    DATA ──── PIN 2
+    DATA ──── PIN 28 (aggiornato da PIN 2)
     (Resistenza pull-up 4.7kΩ tra DATA e VCC)
 
 DS1307 (I2C):
@@ -253,12 +253,12 @@ DIAGRAMMA COMPLETO
     │  │ I2C: SDA(20), SCL(21)                   │ │
     │  │ SPI: D10(CS), D9(RST), D8(DC),          │ │
     │  │      D11(MOSI), D13(SCK)                │ │
-    │  │ SD: D5(CS), D11(MOSI), D12(MISO),       │ │
+    │  │ SD: D4(CS), D11(MOSI), D12(MISO),       │ │
     │  │     D13(SCK)                            │ │
-    │  │ TOUCH: D3(IRQ), D4(CS)                  │ │
-    │  │ SENSORI: D2(DHT11)                      │ │
-    │  │ LED: D6(24bit), D7(12bit)               │ │
-    │  │ BUZZER: D12                             │ │
+    │  │ TOUCH: D7(IRQ), D6(CS)                  │ │
+    │  │ SENSORI: D28(DHT11)                     │ │
+    │  │ LED: D30(24bit), D32(12bit)             │ │
+    │  │ BUZZER: D34                             │ │
     │  │ RELAY: D22-D27 (6 relè)                 │ │
     │  └─────────────────────────────────────────┘ │
     │                                             │
@@ -311,13 +311,24 @@ DIAGRAMMA COMPLETO
     │  ┌─────────┐  ┌─────────┐                   │
     │  │WS2812B  │  │WS2812B  │                   │
     │  │24bit    │  │12bit    │                   │
-    │  │D6       │  │D7       │                   │
+    │  │D30      │  │D32      │                   │
     │  └─────────┘  └─────────┘                   │
     │                                             │
     └─────────────────────────────────────────────┘
 
 NUOVE FUNZIONALITÀ V4.0
 ===============================================================================
+
+OTTIMIZZAZIONE PIN V4.1 (NUOVO):
+    - Tutti i componenti ora sui pin 22-53 (eccetto shield obbligatori)
+    - DHT11: D28 (era D2) - Facilmente accessibile con display montato
+    - LED 24bit: D30 (era D8) - Pin libero area estesa
+    - LED 12bit: D32 (era D9) - Pin libero area estesa  
+    - Buzzer: D34 (era D12) - Pin PWM compatibile area estesa
+    - Relè: D22-D27 (confermati) - Già nell'area corretta
+    - Touch/SD: D4,D6,D7 (obbligatori shield) - Immutati
+    - I2C: D20,D21 (obbligatori) - Immutati
+    - Backlight: D44 (confermato) - Area estesa
 
 SISTEMA VENTOLE:
     - Controllo adattivo basato su condizioni esterne
