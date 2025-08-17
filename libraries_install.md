@@ -24,8 +24,8 @@ Per il corretto funzionamento del sistema Stagionino, è necessario installare l
 ### 2. **Display e Touchscreen**
 ```
 - Adafruit GFX Library  (v1.11.3+) - Libreria grafica base
-- MCUFRIEND_kbv         (v2.9.9+)  - Display ILI9486 8-bit parallelo
-- XPT2046_Touchscreen   (v1.4+)    - Touchscreen capacitivo
+- Nextion Communication (integrata) - Display Nextion NX4832K035
+// XPT2046_Touchscreen - NON NECESSARIA (touch integrato in Nextion)
 ```
 
 ### 3. **LED e Controllo**
@@ -123,7 +123,7 @@ Inizializzazione hardware...
   -> Inizializzazione DHT11
      DHT11: Inizializzato
 -> Inizializzazione display
-  -> Inizializzazione Display ILI9486
+  -> Inizializzazione Display Nextion NX4832K035
      Display ID: 0x9486
      Display: OK - Risoluzione: 480x320
   -> Inizializzazione Touchscreen XPT2046

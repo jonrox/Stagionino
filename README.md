@@ -8,7 +8,7 @@
 Il sistema mantiene automaticamente le condizioni ottimali di temperatura e umidità per la stagionatura dei salumi, controllando 6 attuatori (frigorifero, riscaldatore, deumidificatore, umidificatore, ventole) con **protezioni multiple**, **sistema emergenze avanzato**, **LED WS2812B colorati** e **interfaccia touch professionale**.
 
 ### 🎉 **SISTEMA COMPLETO E FUNZIONALE V1.2** 
-✅ **Display ILI9486/9488 ottimizzato** | ✅ **Touch XPT2046 con pin condivisi** | ✅ **Modalità demo avanzata** | ✅ **Pronto per uso reale**
+✅ **Display Nextion NX4832K035** | ✅ **Interfaccia Touch professionale** | ✅ **Modalità demo avanzata** | ✅ **Pronto per uso reale**
 
 ### 🎯 Caratteristiche Principali
 
@@ -29,7 +29,7 @@ Il sistema mantiene automaticamente le condizioni ottimali di temperatura e umid
 - **Controllo Solo Temperatura**: Opzione per controllare solo la temperatura
 
 - **🖥️ Display e Touch Ottimizzati V1.2**:
-  - **Rilevamento Automatico**: Controller ILI9486/ILI9488 con ID display diagnostico
+  - **Display Nextion**: NX4832K035 con interfaccia touch professionale
   - **Pin Condivisi Gestiti**: Soluzione robusta per pin Touch/SD/TFT condivisi
   - **Test Pattern**: Comando `testdisplay` per diagnostica colori (rosso, verde, blu, bianco, nero)
   - **Touch Calibrato**: Comando `testtouch` per verifica touchscreen XPT2046
@@ -47,7 +47,7 @@ Il sistema mantiene automaticamente le condizioni ottimali di temperatura e umid
 ## 🚀 **OTTIMIZZAZIONI VERSIONE 1.2**
 
 ### **🖥️ DISPLAY E TOUCHSCREEN OTTIMIZZATI**
-- **Controller Multipli**: Supporto ILI9486 e ILI9488 con rilevamento automatico
+- **Display Moderno**: Nextion NX4832K035 con processore grafico dedicato
 - **Gestione Pin Condivisi**: Soluzione robusta per pin Touch/SD/TFT condivisi su shield MCUFRIEND
 - **Diagnostica Display**: Test pattern colorati per verifica funzionamento
 - **Touch Preciso**: Ripristino pin dopo ogni lettura per compatibilità shield
@@ -104,15 +104,15 @@ Il sistema mantiene automaticamente le condizioni ottimali di temperatura e umid
 
 ### **🔍 DIAGNOSTICA PRODUZIONE CON TOUCH**
 - **Schermata Diagnostica**: Accessibile da Impostazioni → Diagnostica
-- **Test Display**: `testdisplay` - Pattern colorati per verifica ILI9486/9488
+- **Test Display**: `nextion` - Test comunicazione e funzionalità display Nextion
 - **Test Touch**: `testtouch` - Verifica touchscreen XPT2046 con punti visuali
 - **Test Memoria**: Analisi RAM in tempo reale con soglie colorate
 - **Status Hardware**: Sensori, SD, RTC con indicatori visivi
 - **Comandi Seriali**: `status`, `refresh`, `backlight` per debug completo
 
 ### ✅ **Compatibilità Verificata Post-Ottimizzazione V1.2**
-✅ **Display**: ILI9486/ILI9488 con rilevamento automatico  
-✅ **Touch**: XPT2046 con gestione pin condivisi MCUFRIEND  
+✅ **Display**: Nextion NX4832K035 con interfaccia touch professionale  
+✅ **Touch**: Integrato nel display Nextion (nessun pin aggiuntivo)  
 ✅ **Memoria RAM**: +2000 bytes libera (margine sicurezza)  
 ✅ **Timing**: Risposta 4x più rapida in condizioni critiche  
 ✅ **SD Card**: Gestione robusta senza blocchi sistema  
@@ -159,7 +159,7 @@ La modalità demo permette di testare completamente il sistema Stagionino senza 
   - `demo` → Attiva modalità demo
   - `nodemo` → Disattiva modalità demo  
   - `status` → Mostra stato completo sistema
-  - `testdisplay` → Test diagnostico display ILI9486/9488
+  - `nextion` → Test diagnostico display Nextion NX4832K035
   - `testtouch` → Test diagnostico touchscreen XPT2046
   - `refresh` → Forza aggiornamento display immediato
 
@@ -259,7 +259,7 @@ Fine fase: Stagionatura continua
 | Componente | Modello | Quantità | Funzione |
 |------------|---------|----------|----------|
 | **Controller** | Arduino Mega 2560 | 1 | Controllo principale |
-| **Display** | ILI9486/ILI9488 LCD 3.5" Touch | 1 | Interfaccia utente (rilevamento automatico) |
+| **Display** | Nextion NX4832K035 LCD 3.5" Touch | 1 | Interfaccia utente professionale |
 | **Sensore Interno** | AM2315C | 1 | Temperatura/umidità interna |
 | **Sensore Esterno** | DHT11 | 1 | Temperatura/umidità esterna |
 | **RTC** | DS1307 | 1 | Orologio real-time |
@@ -284,24 +284,22 @@ Fine fase: Stagionatura continua
 |-----|------------|----------|-----------|
 | **SDA(20), SCL(21)** | AM2315C + DS1307 | I2C - Sensori e RTC | Standard I2C |
 | **D2** | DHT11 | Sensore esterno | Pin dedicato |
-| **Auto** | ILI9486/ILI9488 | Display TFT 8-bit parallelo | Pin automatici MCUFRIEND |
-| **D11** | MOSI | SD CARD/XPT2046 MOSI | **SPI condiviso** |
-| **D12** | MISO | SD CARD/XPT2046 MISO | **SPI condiviso** |
-| **D13** | SCK | SD CARD/XPT2046 SCK | **SPI condiviso** |
+| **UART** | Nextion NX4832K035 | Display TFT con touch seriale | TX1=18, RX1=19 |
+| **D11** | MOSI | SD CARD MOSI | **SPI** |
+| **D12** | MISO | SD CARD MISO | **SPI** |
+| **D13** | SCK | SD CARD SCK | **SPI** |
 | **D4** | CS | SD CARD CS | **Pin dedicato** |
-| **D6** | CS | XPT2046 Touch CS | **Pin dedicato** |
-| **D7** | IRQ | XPT2046 Touch IRQ | **Pin dedicato** |
 | **D44** | BACKLIGHT | Controllo retroilluminazione PWM | Opzionale se supportato |
 | **D8** | WS2812B 24bit | LED indicatori principali | Pin dedicato |
 | **D9** | WS2812B 12bit | LED indicatori secondari | Pin dedicato |
 | **D10** | Buzzer Passivo | Allarmi acustici (PWM/tone) | Pin dedicato |
 | **D22-D27** | Relè 1-6 | Controllo attuatori | Logica invertita |
 
-### **⚠️ IMPORTANTE: Pin SPI Condivisi**
-- **Touch/SD condividono**: MOSI(11), MISO(12), SCK(13)
-- **CS separati**: Touch(6), SD(4) - gestione automatica
-- **Soluzione V1.2**: Ripristino pin dopo ogni operazione touch
-- **Shield MCUFRIEND**: Compatibilità garantita con gestione pin condivisi
+### **✅ VANTAGGI NEXTION: Pin Liberi**
+- **Solo UART**: TX1(18), RX1(19) per display e touch
+- **Pin SPI**: Solo per SD Card - nessun conflitto
+- **18+ Pin liberati**: Disponibili per altre funzioni
+- **Cablaggio semplice**: 4 fili vs 20+ precedenti
 
 #### **📚 Librerie Arduino Necessarie V1.2**
 ```cpp
@@ -310,8 +308,7 @@ Fine fase: Stagionatura continua
 #include <Adafruit_AM2315.h>         // Sensore AM2315C (v2.1.0+)
 #include <DHT.h>                     // Sensore DHT11 (v1.4.4+)
 #include <RTClib.h>                  // RTC DS1307 (v2.1.1+)
-#include <MCUFRIEND_kbv.h>           // Display ILI9486/ILI9488 (v2.9.9+)
-#include <XPT2046_Touchscreen.h>     // Touch screen XPT2046 (v1.4+)
+#include "nextion_protocol.h"        // Display Nextion NX4832K035 (tutto-in-uno)
 #include <FastLED.h>                 // LED WS2812B (v3.5.0+)
 #include <EEPROM.h>                  // Memoria persistente (inclusa)
 #include <SD.h>                      // SD Card (inclusa)
@@ -363,7 +360,7 @@ Fine fase: Stagionatura continua
 demo         → Attiva modalità demo
 nodemo       → Disattiva modalità demo  
 status       → Mostra stato completo sistema
-testdisplay  → Test diagnostico display ILI9486/9488
+nextion      → Test diagnostico display Nextion NX4832K035
 testtouch    → Test diagnostico touchscreen XPT2046
 refresh      → Forza aggiornamento display immediato
 backlight    → Test controllo retroilluminazione
@@ -373,8 +370,8 @@ backlight    → Test controllo retroilluminazione
 
 ## 🏆 **Sistema Stagionino V1.2 - Caratteristiche Finali**
 
-✅ **Display Ottimizzato**: ILI9486/ILI9488 con rilevamento automatico e gestione pin condivisi  
-✅ **Touch Precision**: XPT2046 calibrato con soluzione pin condivisi MCUFRIEND  
+✅ **Display Ottimizzato**: Nextion NX4832K035 con interfaccia touch professionale e comunicazione seriale  
+✅ **Touch Precision**: Integrato nel Nextion con calibrazione automatica  
 ✅ **Modalità Demo Avanzata**: Sistema completo funzionante senza sensori fisici  
 ✅ **Performance 4x**: Timing ottimizzato per controllo critico real-time  
 ✅ **Memoria Ottimizzata**: +2000 bytes RAM libera per stabilità  
